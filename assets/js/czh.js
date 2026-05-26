@@ -311,7 +311,6 @@
     btn.className = 'czcr-toolbar__btn czh-toolbar-btn';
     btn.setAttribute('aria-label', i18n.highlight);
     btn.setAttribute('data-czh-do-highlight', '');
-    btn.hidden = true;
     btn.innerHTML = `
       <span class="czcr-icon" aria-hidden="true">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -319,7 +318,10 @@
         </svg>
       </span>`;
     btn.addEventListener('click', onHighlightRequest);
-    toolbar.appendChild(btn);
+    // Insert as second child so it sits between the two existing toolbar buttons
+    const secondChild = toolbar.children[1];
+    if (secondChild) toolbar.insertBefore(btn, secondChild);
+    else toolbar.appendChild(btn);
     return btn;
   }
 
@@ -473,7 +475,7 @@
     if (!pending || !ctx || !ctx.postId) return;
 
     hideTooltip();
-    if (toolbarBtn) toolbarBtn.hidden = true;
+    if (toolbarBtn) toolbarBtn.classList.remove('czh-is-visible');
 
     const fp = pending;
     pending = null;
@@ -640,7 +642,7 @@
     if (!selectionInContent(selection, container)) {
       pending = null;
       if (!isTouch) hideTooltip();
-      if (toolbarBtn) toolbarBtn.hidden = true;
+      if (toolbarBtn) toolbarBtn.classList.remove('czh-is-visible');
       return;
     }
 
@@ -651,7 +653,7 @@
     pending = fp;
 
     if (isTouch && toolbarBtn) {
-      toolbarBtn.hidden = false;
+      toolbarBtn.classList.add('czh-is-visible');
     }
   }
 
