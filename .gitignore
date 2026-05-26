@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Build artifacts (sourcemaps)
+assets/js/*.map
+assets/css/*.map
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo

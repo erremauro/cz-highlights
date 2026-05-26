@@ -1,0 +1,11 @@
+{
+  "name": "cz-highlights",
+  "private": true,
+  "devDependencies": {
+    "esbuild": "^0.23.0"
+  },
+  "scripts": {
+    "build": "node scripts/build.js",
+    "watch": "node scripts/build.js --watch"
+  }
+}
