@@ -298,7 +298,7 @@ final class CZ_Highlights {
 		if ( ! $this->highlights_enabled() ) {
 			return '';
 		}
-		return '<h1 class="czh-notes__page-title">' . esc_html__( 'Le mie Note', 'cz-highlights' ) . '</h1>'
+		return '<h1 class="czh-notes__page-title">' . esc_html__( 'Le Mie Note', 'cz-highlights' ) . '</h1>'
 			. '<div id="czh-notes-app" class="czh-notes-app"><p class="czh-notes__loading">' . esc_html__( 'Caricamento…', 'cz-highlights' ) . '</p></div>';
 	}
 
@@ -316,7 +316,7 @@ final class CZ_Highlights {
 			?>
 			<button type="button" role="menuitem" class="czh-nav-notes-btn" data-czh-open-drawer>
 				<?php echo $svg; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
-				<span><?php esc_html_e( 'Le mie Note', 'cz-highlights' ); ?></span>
+				<span><?php esc_html_e( 'Le Mie Note', 'cz-highlights' ); ?></span>
 			</button>
 			<?php
 		} else {
@@ -324,7 +324,7 @@ final class CZ_Highlights {
 			?>
 			<a role="menuitem" href="<?php echo esc_url( $this->get_notes_page_url() ); ?>">
 				<?php echo $svg; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
-				<span><?php esc_html_e( 'Le mie Note', 'cz-highlights' ); ?></span>
+				<span><?php esc_html_e( 'Le Mie Note', 'cz-highlights' ); ?></span>
 			</a>
 			<?php
 		}

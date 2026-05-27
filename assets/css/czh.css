@@ -205,30 +205,30 @@ body.czh-style-underline mark.czh-hl {
 .czh-popover__add-note,
 .czh-popover__delete {
   appearance: none;
-  border: none;
-  border-radius: 4px;
+  background: none;
+  border: 1px solid currentColor;
+  border-radius: 99px;
   cursor: pointer;
   font-size: .8rem;
   font-family: inherit;
-  padding: .35rem .5rem;
-  transition: opacity .12s ease;
+  padding: .3rem .6rem;
+  line-height: 1.4;
+  transition: background-color .15s, color .15s;
 }
 
 .czh-popover__add-note {
   flex: 1;
   text-align: center;
-  background: rgba(128,128,128,.15);
   color: var(--czh-text);
 }
 
 .czh-popover__delete {
-  background: rgba(200,60,60,.18);
-  color: rgba(230,100,100,1);
+  color: var(--color-danger, #bc0117);
   white-space: nowrap;
 }
 
-.czh-popover__add-note:hover,
-.czh-popover__delete:hover { opacity: .75; }
+.czh-popover__add-note:hover { background-color: rgba(128,128,128,.12); }
+.czh-popover__delete:hover   { background-color: var(--color-danger, #bc0117); border-color: var(--color-danger, #bc0117); color: #fff; }
 
 .czh-color-btn {
   width: 22px;
@@ -390,22 +390,24 @@ body.czh-style-underline mark.czh-hl {
 .czh-note-modal__cancel,
 .czh-note-modal__delete {
   appearance: none;
-  border: none;
-  border-radius: 6px;
+  background: none;
+  border: 1px solid currentColor;
+  border-radius: 99px;
   cursor: pointer;
   font-size: .85rem;
   font-family: inherit;
   padding: .4rem .9rem;
-  transition: opacity .12s ease;
+  line-height: 1.4;
+  transition: background-color .15s, color .15s;
 }
 
-.czh-note-modal__ok     { background: rgba(128,128,128,.25); color: var(--czh-text); }
-.czh-note-modal__cancel { background: rgba(128,128,128,.12); color: var(--czh-text-muted); }
-.czh-note-modal__delete { background: rgba(200,60,60,.18);   color: rgba(230,100,100,1); }
+.czh-note-modal__ok     { color: var(--czh-text); }
+.czh-note-modal__cancel { color: var(--czh-text-muted); }
+.czh-note-modal__delete { color: var(--color-danger, #bc0117); }
 
-.czh-note-modal__ok:hover,
-.czh-note-modal__cancel:hover,
-.czh-note-modal__delete:hover { opacity: .75; }
+.czh-note-modal__ok:hover     { background-color: rgba(128,128,128,.15); }
+.czh-note-modal__cancel:hover { background-color: rgba(128,128,128,.08); }
+.czh-note-modal__delete:hover { background-color: var(--color-danger, #bc0117); border-color: var(--color-danger, #bc0117); color: #fff; }
 
 body.czh-overlay-open { overflow: hidden; }
 
@@ -591,21 +593,26 @@ body.czh-overlay-open { overflow: hidden; }
 .czh-drawer__edit-btn,
 .czh-drawer__del-btn {
   appearance: none;
-  border: none;
-  border-radius: 4px;
+  background: none;
+  border: 1px solid currentColor;
+  border-radius: 99px;
   cursor: pointer;
   font-size: .75rem;
-  padding: .2rem .55rem;
-  transition: opacity .12s ease;
+  font-family: inherit;
+  padding: .2rem .65rem;
+  line-height: 1.4;
+  transition: background-color .15s, color .15s;
 }
 
-.czh-drawer__scroll-btn { background: rgba(128,128,128,.2); color: var(--czh-text); }
-.czh-drawer__edit-btn   { background: rgba(128,128,128,.2); color: var(--czh-text); }
-.czh-drawer__del-btn    { background: rgba(200,60,60,.15);  color: rgba(230,100,100,1); }
+.czh-drawer__scroll-btn,
+.czh-drawer__edit-btn { color: var(--czh-text-muted); }
+
+.czh-drawer__del-btn { color: var(--color-danger, #bc0117); }
 
 .czh-drawer__scroll-btn:hover,
-.czh-drawer__edit-btn:hover,
-.czh-drawer__del-btn:hover { opacity: .75; }
+.czh-drawer__edit-btn:hover { background-color: rgba(128,128,128,.12); }
+
+.czh-drawer__del-btn:hover { background-color: var(--color-danger, #bc0117); border-color: var(--color-danger, #bc0117); color: #fff; }
 
 /* ── Mobile toolbar button ────────────────────────────────────────────────── */
 
@@ -869,27 +876,32 @@ body.czh-overlay-open { overflow: hidden; }
 .czh-notes__save-btn,
 .czh-notes__cancel-btn {
   appearance: none;
-  border: none;
-  border-radius: 4px;
+  background: none;
+  border: 1px solid currentColor;
+  border-radius: 99px;
   cursor: pointer;
   font-size: .75rem;
-  padding: .2rem .55rem;
-  transition: opacity .12s ease;
+  font-family: inherit;
+  padding: .2rem .65rem;
+  line-height: 1.4;
+  transition: background-color .15s, color .15s;
 }
 
 .czh-notes__goto-btn,
 .czh-notes__edit-btn,
-.czh-notes__save-btn { background: rgba(128,128,128,.2); color: var(--czh-text); }
+.czh-notes__save-btn { color: var(--czh-text-muted); }
 
-.czh-notes__cancel-btn { background: rgba(128,128,128,.12); color: var(--czh-text-muted); }
+.czh-notes__cancel-btn { color: var(--czh-text-muted); opacity: 0.55; }
 
-.czh-notes__del-btn { background: rgba(200,60,60,.15); color: rgba(230,100,100,1); }
+.czh-notes__del-btn { color: var(--color-danger, #bc0117); }
 
 .czh-notes__goto-btn:hover,
 .czh-notes__edit-btn:hover,
-.czh-notes__save-btn:hover,
-.czh-notes__cancel-btn:hover,
-.czh-notes__del-btn:hover { opacity: .75; }
+.czh-notes__save-btn:hover { background-color: rgba(128,128,128,.12); }
+
+.czh-notes__cancel-btn:hover { background-color: rgba(128,128,128,.08); opacity: 1; }
+
+.czh-notes__del-btn:hover { background-color: var(--color-danger, #bc0117); border-color: var(--color-danger, #bc0117); color: #fff; }
 
 /* ── Edit mode ── */
 
