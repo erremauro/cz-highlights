@@ -325,7 +325,7 @@
     return btn;
   }
 
-  // ── Note popover ───────────────────────────────────────────────────────────
+  // ── Note popover (color picker, appears anchored to mark) ─────────────────
 
   let popover = null;
   let currentPopoverHighlightId = null;
@@ -334,16 +334,20 @@
     const el = document.createElement('div');
     el.className = 'czh-popover';
     el.setAttribute('role', 'dialog');
-    el.setAttribute('aria-label', i18n.add_note);
     el.innerHTML = `
-      <div class="czh-popover__colors"></div>
-      <textarea class="czh-popover__note" placeholder="${escapeAttr(i18n.add_note)}" rows="3"></textarea>
+      <div class="czh-popover__header">
+        <div class="czh-popover__colors"></div>
+        <button type="button" class="czh-popover__close" aria-label="${escapeAttr(i18n.close)}">
+          <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <path d="M18 6 6 18M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
       <div class="czh-popover__actions">
-        <button type="button" class="czh-popover__save">${i18n.save_note}</button>
+        <button type="button" class="czh-popover__add-note">${i18n.add_note_btn}</button>
         <button type="button" class="czh-popover__delete">${i18n.delete}</button>
       </div>`;
 
-    // Color buttons
     const colorsEl = el.querySelector('.czh-popover__colors');
     cfg.colors.forEach(color => {
       const btn = document.createElement('button');
@@ -351,35 +355,33 @@
       btn.className = 'czh-color-btn';
       btn.dataset.color = color;
       btn.setAttribute('aria-label', color);
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         el.querySelectorAll('.czh-color-btn').forEach(b => b.classList.remove('is-active'));
         btn.classList.add('is-active');
-        // Live-update mark color in DOM
         if (currentPopoverHighlightId) {
           document.querySelectorAll(`.czh-hl[data-id="${currentPopoverHighlightId}"]`).forEach(m => {
             m.dataset.color = color;
           });
+          try {
+            const hl = highlights.find(h => h.id === currentPopoverHighlightId);
+            if (hl) {
+              await apiFetch(`highlights/${currentPopoverHighlightId}`, { method: 'PATCH', body: { note: hl.note || '', color } });
+              hl.color = color;
+              refreshDrawerList();
+            }
+          } catch (e) { console.error('[CZH] color patch failed', e); }
         }
       });
       colorsEl.appendChild(btn);
     });
 
-    el.querySelector('.czh-popover__save').addEventListener('click', async () => {
-      const id    = currentPopoverHighlightId;
-      const note  = el.querySelector('.czh-popover__note').value;
-      const color = (el.querySelector('.czh-color-btn.is-active') || {}).dataset?.color || 'yellow';
-      if (!id) return;
-      try {
-        const updated = await apiFetch(`highlights/${id}`, { method: 'PATCH', body: { note, color } });
-        const hl = highlights.find(h => h.id === id);
-        if (hl) { hl.note = updated.note; hl.color = updated.color; }
-        document.querySelectorAll(`.czh-hl[data-id="${id}"]`).forEach(m => {
-          m.dataset.note  = note;
-          m.dataset.color = color;
-        });
-        refreshDrawerList();
-      } catch (e) { console.error('[CZH] patch failed', e); }
+    el.querySelector('.czh-popover__close').addEventListener('click', () => hidePopover());
+
+    el.querySelector('.czh-popover__add-note').addEventListener('click', () => {
+      const id = currentPopoverHighlightId;
       hidePopover();
+      const hl = highlights.find(h => h.id === id);
+      if (hl) showNoteOverlay(hl);
     });
 
     el.querySelector('.czh-popover__delete').addEventListener('click', async () => {
@@ -403,22 +405,16 @@
 
     currentPopoverHighlightId = highlight.id;
 
-    // Set color
     popover.querySelectorAll('.czh-color-btn').forEach(btn => {
       btn.classList.toggle('is-active', btn.dataset.color === highlight.color);
     });
 
-    // Set note
-    popover.querySelector('.czh-popover__note').value = highlight.note || '';
-
-    // Position near the mark
     const rect = anchorMark.getBoundingClientRect();
     const x = rect.left + rect.width / 2 + window.scrollX;
     const y = rect.bottom + window.scrollY + 8;
     popover.style.transform = `translate(calc(${x}px - 50%), ${y}px)`;
     popover.classList.add('is-visible');
 
-    // Close on outside click
     setTimeout(() => {
       document.addEventListener('mousedown', onPopoverOutside, { once: true });
     }, 10);
@@ -437,28 +433,182 @@
     currentPopoverHighlightId = null;
   }
 
-  // ── Note popover for NEW highlight ────────────────────────────────────────
-
   function showNewHighlightPopover(highlight, markEl) {
-    if (!popover) popover = buildPopover();
-
-    currentPopoverHighlightId = highlight.id;
-
-    // Reset to defaults
-    popover.querySelectorAll('.czh-color-btn').forEach(btn => {
-      btn.classList.toggle('is-active', btn.dataset.color === highlight.color);
-    });
-    popover.querySelector('.czh-popover__note').value = '';
-
     const rect = markEl ? markEl.getBoundingClientRect() : { left: window.innerWidth / 2, bottom: 100, width: 0 };
-    const x = rect.left + rect.width / 2 + window.scrollX;
-    const y = rect.bottom + window.scrollY + 8;
-    popover.style.transform = `translate(calc(${x}px - 50%), ${y}px)`;
-    popover.classList.add('is-visible');
+    showPopover({ getBoundingClientRect: () => rect }, highlight);
+  }
 
-    setTimeout(() => {
-      document.addEventListener('mousedown', onPopoverOutside, { once: true });
-    }, 10);
+  // ── Full-screen note overlay ────────────────────────────────────────────────
+
+  let noteOverlay = null;
+  let currentNoteOverlayHighlightId = null;
+
+  function buildNoteOverlay() {
+    const el = document.createElement('div');
+    el.className = 'czh-note-overlay';
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-modal', 'true');
+    el.innerHTML = `
+      <div class="czh-note-modal">
+        <div class="czh-note-modal__header">
+          <div class="czh-note-modal__colors"></div>
+          <button type="button" class="czh-note-modal__close" aria-label="${escapeAttr(i18n.close)}">
+            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+              <path d="M18 6 6 18M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+        <div class="czh-note-modal__body">
+          <blockquote class="czh-note-modal__quote"></blockquote>
+          <div class="czh-note-modal__note"
+               contenteditable="true"
+               role="textbox"
+               aria-multiline="true"
+               data-placeholder="${escapeAttr(i18n.add_note)}"></div>
+        </div>
+        <div class="czh-note-modal__footer">
+          <button type="button" class="czh-note-modal__delete">${i18n.delete}</button>
+          <button type="button" class="czh-note-modal__cancel">${i18n.cancel}</button>
+          <button type="button" class="czh-note-modal__ok">${i18n.save_note}</button>
+        </div>
+      </div>`;
+
+    // Color buttons
+    const colorsEl = el.querySelector('.czh-note-modal__colors');
+    cfg.colors.forEach(color => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'czh-color-btn';
+      btn.dataset.color = color;
+      btn.setAttribute('aria-label', color);
+      btn.addEventListener('click', async () => {
+        el.querySelectorAll('.czh-note-modal__colors .czh-color-btn').forEach(b => b.classList.remove('is-active'));
+        btn.classList.add('is-active');
+        el.querySelector('.czh-note-modal__quote').dataset.color = color;
+        if (currentNoteOverlayHighlightId) {
+          document.querySelectorAll(`.czh-hl[data-id="${currentNoteOverlayHighlightId}"]`).forEach(m => {
+            m.dataset.color = color;
+          });
+          try {
+            const hl = highlights.find(h => h.id === currentNoteOverlayHighlightId);
+            if (hl) {
+              await apiFetch(`highlights/${currentNoteOverlayHighlightId}`, { method: 'PATCH', body: { note: hl.note || '', color } });
+              hl.color = color;
+              refreshDrawerList();
+            }
+          } catch (e) { console.error('[CZH] color patch failed', e); }
+        }
+      });
+      colorsEl.appendChild(btn);
+    });
+
+    // Plain-text-only paste
+    const noteField = el.querySelector('.czh-note-modal__note');
+    noteField.addEventListener('paste', e => {
+      e.preventDefault();
+      const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+      document.execCommand('insertText', false, text);
+    });
+
+    el.querySelector('.czh-note-modal__close').addEventListener('click', () => hideNoteOverlay());
+    el.querySelector('.czh-note-modal__cancel').addEventListener('click', () => hideNoteOverlay());
+
+    el.querySelector('.czh-note-modal__ok').addEventListener('click', async () => {
+      const id    = currentNoteOverlayHighlightId;
+      const note  = el.querySelector('.czh-note-modal__note').textContent.trim();
+      const color = el.querySelector('.czh-note-modal__colors .czh-color-btn.is-active')?.dataset?.color || 'yellow';
+      if (!id) return;
+      try {
+        const updated = await apiFetch(`highlights/${id}`, { method: 'PATCH', body: { note, color } });
+        const hl = highlights.find(h => h.id === id);
+        if (hl) { hl.note = updated.note; hl.color = updated.color; }
+        document.querySelectorAll(`.czh-hl[data-id="${id}"]`).forEach(m => {
+          m.dataset.note  = note;
+          m.dataset.color = color;
+        });
+        refreshDrawerList();
+        // Update notes-page item if present
+        const notesItem = document.querySelector(`#czh-notes-app .czh-notes__item[data-id="${id}"]`);
+        if (notesItem) {
+          notesItem.dataset.color = updated.color;
+          const readEl = notesItem.querySelector('.czh-notes__item-read');
+          if (readEl) {
+            let annotEl = readEl.querySelector('.czh-notes__annotation');
+            if (updated.note) {
+              if (annotEl) { annotEl.textContent = updated.note; }
+              else {
+                annotEl = document.createElement('p');
+                annotEl.className = 'czh-notes__annotation';
+                annotEl.textContent = updated.note;
+                readEl.insertBefore(annotEl, readEl.querySelector('.czh-notes__item-footer'));
+              }
+            } else if (annotEl) {
+              annotEl.remove();
+            }
+          }
+        }
+      } catch (e) { console.error('[CZH] save note failed', e); }
+      hideNoteOverlay();
+    });
+
+    el.querySelector('.czh-note-modal__delete').addEventListener('click', async () => {
+      const id = currentNoteOverlayHighlightId;
+      if (!id) return;
+      try {
+        await apiFetch(`highlights/${id}`, { method: 'DELETE' });
+        highlights = highlights.filter(h => h.id !== id);
+        removeHighlightFromDOM(id);
+        refreshDrawerList();
+        // Remove notes-page item if present
+        const notesItem = document.querySelector(`#czh-notes-app .czh-notes__item[data-id="${id}"]`);
+        if (notesItem) {
+          const notesApp  = document.getElementById('czh-notes-app');
+          const itemsEl   = notesItem.closest('.czh-notes__items');
+          const sectionEl = notesItem.closest('.collapsable-section');
+          notesItem.remove();
+          if (itemsEl && !itemsEl.querySelector('.czh-notes__item')) sectionEl?.remove();
+          if (notesApp && !notesApp.querySelector('.czh-notes__item')) {
+            const articles = notesApp.querySelector('.czh-notes__articles');
+            if (articles) articles.innerHTML = `<p class="czh-notes__empty">${escapeHtml(i18n.no_notes_volume)}</p>`;
+          }
+        }
+      } catch (e) { console.error('[CZH] delete failed', e); }
+      hideNoteOverlay();
+    });
+
+    // Backdrop click closes
+    el.addEventListener('click', e => { if (e.target === el) hideNoteOverlay(); });
+
+    document.body.appendChild(el);
+    return el;
+  }
+
+  function showNoteOverlay(hl) {
+    if (!noteOverlay) noteOverlay = buildNoteOverlay();
+
+    currentNoteOverlayHighlightId = hl.id;
+
+    noteOverlay.querySelectorAll('.czh-note-modal__colors .czh-color-btn').forEach(btn => {
+      btn.classList.toggle('is-active', btn.dataset.color === hl.color);
+    });
+
+    const quote = noteOverlay.querySelector('.czh-note-modal__quote');
+    quote.textContent = hl.selected_text;
+    quote.dataset.color = hl.color;
+
+    noteOverlay.querySelector('.czh-note-modal__note').textContent = hl.note || '';
+
+    noteOverlay.classList.add('is-visible');
+    document.body.classList.add('czh-overlay-open');
+
+    setTimeout(() => noteOverlay.querySelector('.czh-note-modal__note')?.focus(), 100);
+  }
+
+  function hideNoteOverlay() {
+    if (!noteOverlay) return;
+    noteOverlay.classList.remove('is-visible');
+    document.body.classList.remove('czh-overlay-open');
+    currentNoteOverlayHighlightId = null;
   }
 
   // ── Do Highlight ───────────────────────────────────────────────────────────
@@ -559,7 +709,7 @@
             data-czh-goto-permalink="${escapeAttr(ctx.permalink || '')}"
             data-czh-goto-page="${pageNum}"
             data-czh-same-page="${samePageMark ? '1' : '0'}">Vai</button>
-          <button type="button" class="czh-drawer__edit-btn" data-czh-edit="${h.id}">${i18n.add_note}</button>
+          <button type="button" class="czh-drawer__edit-btn" data-czh-edit="${h.id}">${i18n.edit}</button>
           <button type="button" class="czh-drawer__del-btn" data-czh-delete="${h.id}">${i18n.delete}</button>
         </div>
       </div>`; }).join('');
@@ -585,15 +735,14 @@
       });
     });
 
-    // Edit buttons → open popover
+    // Edit buttons → open note overlay
     body.querySelectorAll('[data-czh-edit]').forEach(btn => {
       btn.addEventListener('click', () => {
         const id = Number(btn.dataset.czhEdit);
         const hl = highlights.find(h => h.id === id);
         if (!hl) return;
-        const mark = document.querySelector(`.czh-hl[data-id="${id}"]`);
         closeDrawer();
-        setTimeout(() => showPopover(mark || document.body, hl), 280);
+        setTimeout(() => showNoteOverlay(hl), 280);
       });
     });
 
@@ -618,7 +767,9 @@
     if (!mark) return;
     const id = Number(mark.dataset.id);
     const hl = highlights.find(h => h.id === id);
-    if (hl) showPopover(mark, hl);
+    if (!hl) return;
+    if (hl.note) showNoteOverlay(hl);
+    else showPopover(mark, hl);
   }
 
   // ── Selection detection ────────────────────────────────────────────────────
@@ -975,15 +1126,18 @@
       });
     });
 
-    // Toggle read → edit
+    // Edit → open full overlay
     app.querySelectorAll('[data-czh-notes-edit]').forEach(btn => {
       btn.addEventListener('click', () => {
         const id   = Number(btn.dataset.czhNotesEdit);
         const item = app.querySelector(`.czh-notes__item[data-id="${id}"]`);
         if (!item) return;
-        item.querySelector('.czh-notes__item-read').hidden = true;
-        item.querySelector('.czh-notes__item-edit').hidden = false;
-        item.querySelector('.czh-notes__edit-textarea').focus();
+        showNoteOverlay({
+          id,
+          selected_text: item.querySelector('.czh-notes__quote')?.textContent || '',
+          note:          item.querySelector('.czh-notes__annotation')?.textContent || '',
+          color:         item.dataset.color || 'yellow',
+        });
       });
     });
 

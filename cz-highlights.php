@@ -143,6 +143,7 @@ final class CZ_Highlights {
 				],
 				'i18n'    => [
 					'highlight'       => __( 'Evidenzia', 'cz-highlights' ),
+					'add_note_btn'    => __( 'Aggiungi Nota', 'cz-highlights' ),
 					'save_note'       => __( 'Salva nota', 'cz-highlights' ),
 					'delete'          => __( 'Elimina', 'cz-highlights' ),
 					'add_note'        => __( 'Aggiungi una nota…', 'cz-highlights' ),
