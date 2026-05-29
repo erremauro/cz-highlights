@@ -757,6 +757,13 @@ body.czh-overlay-open { overflow: hidden; }
   margin-bottom: 1.75em;
 }
 
+.czh-notes__detail-header-actions {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+
+.czh-notes__edit-toggle-btn,
 .czh-notes__collapse-all-btn {
   appearance: none;
   background: transparent;
@@ -769,10 +776,18 @@ body.czh-overlay-open { overflow: hidden; }
   font-family: inherit;
   padding: .2rem .85rem;
   line-height: 1.5;
-  transition: opacity 0.15s ease;
+  transition: opacity 0.15s ease, background-color 0.15s ease, color 0.15s ease;
 }
 
+.czh-notes__edit-toggle-btn:hover,
 .czh-notes__collapse-all-btn:hover { opacity: 1; }
+
+.czh-notes__edit-toggle-btn.is-active {
+  opacity: 1;
+  background-color: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
+}
 
 .czh-notes__back-btn {
   appearance: none;
@@ -839,6 +854,62 @@ body.czh-overlay-open { overflow: hidden; }
   color: var(--czh-text);
 }
 
+.czh-notes__quote--clickable {
+  cursor: pointer;
+}
+
+#czh-notes-app.czh-edit-mode .czh-notes__quote--clickable {
+  cursor: auto;
+}
+
+/* ── Quote action popup (segmented pill) ──────────────────────────────────── */
+
+.czh-quote-popup {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 10002;
+  display: flex;
+  align-items: stretch;
+  background: var(--czh-surface);
+  border: 1px solid var(--czh-surface-border);
+  border-radius: 99px;
+  box-shadow: var(--czh-shadow);
+  overflow: hidden;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .12s ease;
+}
+
+.czh-quote-popup.is-visible {
+  pointer-events: auto;
+  opacity: 1;
+}
+
+.czh-quote-popup__btn {
+  background: none;
+  border: none;
+  padding: .3rem .85rem;
+  cursor: pointer;
+  font-size: .8rem;
+  font-family: inherit;
+  color: var(--czh-text);
+  line-height: 1.4;
+  transition: background-color .12s ease;
+}
+
+.czh-quote-popup__btn:hover {
+  background-color: rgba(128, 128, 128, .12);
+}
+
+.czh-quote-popup__sep {
+  width: 1px;
+  background: var(--czh-surface-border);
+  flex-shrink: 0;
+  margin: .35rem 0;
+}
+
 .czh-notes__item[data-color="yellow"] .czh-notes__quote { border-left-color: var(--czh-yellow-border); }
 .czh-notes__item[data-color="green"]  .czh-notes__quote { border-left-color: var(--czh-green-border);  }
 .czh-notes__item[data-color="blue"]   .czh-notes__quote { border-left-color: var(--czh-blue-border);   }
@@ -868,6 +939,14 @@ body.czh-overlay-open { overflow: hidden; }
   gap: .4rem;
   margin-top: .55rem;
   flex-wrap: wrap;
+}
+
+/* Hide read-state action buttons by default; shown only in edit mode */
+#czh-notes-app .czh-notes__item-read .czh-notes__item-footer {
+  display: none;
+}
+#czh-notes-app.czh-edit-mode .czh-notes__item-read .czh-notes__item-footer {
+  display: flex;
 }
 
 .czh-notes__goto-btn,

@@ -823,6 +823,7 @@
     const url = new URL(permalink);
     if (pageNum > 1) url.searchParams.set('page', pageNum);
     url.searchParams.set('czh_hl', highlightId);
+    url.searchParams.set('cr', 'disabled');
     return url.toString();
   }
 
@@ -929,12 +930,17 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
             ${escapeHtml(i18n.back_to_volumes)}
           </button>
-          <button type="button" class="czh-notes__collapse-all-btn" data-czh-collapse-all>${escapeHtml(i18n.collapse_all)}</button>
+          <div class="czh-notes__detail-header-actions">
+            <button type="button" class="czh-notes__edit-toggle-btn" data-czh-edit-toggle aria-pressed="false">${escapeHtml(i18n.edit)}</button>
+            <button type="button" class="czh-notes__collapse-all-btn" data-czh-collapse-all>${escapeHtml(i18n.collapse_all)}</button>
+          </div>
         </div>`;
 
       if (!rows.length) {
         app.innerHTML = backBtn + `<p class="czh-notes__empty">${escapeHtml(i18n.no_notes_volume)}</p>`;
+        app.classList.remove('czh-edit-mode');
         wireBackButton(app);
+        wireEditToggleBtn(app);
         return;
       }
 
@@ -963,8 +969,10 @@
       }).join('');
 
       app.innerHTML = backBtn + `<div class="czh-notes__articles">${articlesHtml}</div>`;
+      app.classList.remove('czh-edit-mode');
       wireBackButton(app);
       wireCollapseAllBtn(app);
+      wireEditToggleBtn(app);
       wireNoteActions(app);
     } catch (e) {
       console.error('[CZH] volume detail failed', e);
@@ -983,12 +991,17 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
             ${escapeHtml(i18n.back_to_volumes)}
           </button>
-          <button type="button" class="czh-notes__collapse-all-btn" data-czh-collapse-all>${escapeHtml(i18n.collapse_all)}</button>
+          <div class="czh-notes__detail-header-actions">
+            <button type="button" class="czh-notes__edit-toggle-btn" data-czh-edit-toggle aria-pressed="false">${escapeHtml(i18n.edit)}</button>
+            <button type="button" class="czh-notes__collapse-all-btn" data-czh-collapse-all>${escapeHtml(i18n.collapse_all)}</button>
+          </div>
         </div>`;
 
       if (!rows.length) {
         app.innerHTML = backBtn + `<p class="czh-notes__empty">${escapeHtml(i18n.no_notes_volume)}</p>`;
+        app.classList.remove('czh-edit-mode');
         wireBackButton(app);
+        wireEditToggleBtn(app);
         return;
       }
 
@@ -1016,8 +1029,10 @@
       }).join('');
 
       app.innerHTML = backBtn + `<div class="czh-notes__articles">${articlesHtml}</div>`;
+      app.classList.remove('czh-edit-mode');
       wireBackButton(app);
       wireCollapseAllBtn(app);
+      wireEditToggleBtn(app);
       wireNoteActions(app);
     } catch (e) {
       console.error('[CZH] standalone detail failed', e);
@@ -1076,6 +1091,17 @@
     });
   }
 
+  function wireEditToggleBtn(app) {
+    const btn = app.querySelector('[data-czh-edit-toggle]');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      const active = btn.getAttribute('aria-pressed') !== 'true';
+      btn.setAttribute('aria-pressed', String(active));
+      btn.classList.toggle('is-active', active);
+      app.classList.toggle('czh-edit-mode', active);
+    });
+  }
+
   function buildNoteItemHtml(h) {
     const gotoBtn = h.post
       ? `<button type="button" class="czh-notes__goto-btn" data-czh-goto-permalink="${escapeAttr(h.post.permalink)}" data-czh-goto-page="${h.page_num || 1}" data-czh-goto-id="${h.id}">${escapeHtml(i18n.goto)}</button>`
@@ -1084,9 +1110,13 @@
       `<button type="button" class="czh-color-btn${c === h.color ? ' is-active' : ''}" data-color="${c}" aria-label="${c}"></button>`
     ).join('');
 
+    const quotePermalinkAttrs = h.post
+      ? ` data-czh-quote-permalink="${escapeAttr(h.post.permalink)}" data-czh-quote-page="${h.page_num || 1}"`
+      : '';
+
     return `
       <div class="czh-notes__item" data-id="${h.id}" data-color="${escapeAttr(h.color)}">
-        <blockquote class="czh-notes__quote">${escapeHtml(h.selected_text)}</blockquote>
+        <blockquote class="czh-notes__quote${h.post ? ' czh-notes__quote--clickable' : ''}" data-czh-quote-id="${h.id}"${quotePermalinkAttrs}>${escapeHtml(h.selected_text)}</blockquote>
         <div class="czh-notes__item-read">
           ${h.status === 'displaced' ? `<p class="czh-notes__item-warning">${escapeHtml(i18n.displaced_msg)}</p>` : ''}
           ${h.note ? `<p class="czh-notes__annotation">${escapeHtml(h.note)}</p>` : ''}
@@ -1114,15 +1144,111 @@
       </div>`;
   }
 
+  // ── Quote popup (segmented pill: Apri | Copia | Modifica) ─────────────────
+
+  let quotePopup        = null;
+  let currentQuoteCtx   = null;
+
+  function buildQuotePopup() {
+    const el = document.createElement('div');
+    el.className = 'czh-quote-popup';
+    el.setAttribute('role', 'menu');
+    el.innerHTML = `
+      <button type="button" class="czh-quote-popup__btn" data-czh-qp="goto">Vai</button>
+      <span class="czh-quote-popup__sep" aria-hidden="true"></span>
+      <button type="button" class="czh-quote-popup__btn" data-czh-qp="copy">Copia</button>
+      <span class="czh-quote-popup__sep" aria-hidden="true"></span>
+      <button type="button" class="czh-quote-popup__btn" data-czh-qp="edit">Modifica</button>`;
+
+    el.querySelector('[data-czh-qp="goto"]').addEventListener('click', () => {
+      const ctx = currentQuoteCtx;
+      if (!ctx) return;
+      hideQuotePopup();
+      window.location.href = buildGotoUrl(ctx.permalink, ctx.pageNum, ctx.id);
+    });
+
+    el.querySelector('[data-czh-qp="copy"]').addEventListener('click', async () => {
+      const ctx = currentQuoteCtx;
+      if (!ctx) return;
+      hideQuotePopup();
+      try { await navigator.clipboard.writeText(ctx.text); } catch { /* ignore */ }
+    });
+
+    el.querySelector('[data-czh-qp="edit"]').addEventListener('click', () => {
+      const ctx = currentQuoteCtx;
+      if (!ctx) return;
+      hideQuotePopup();
+      showNoteOverlay(ctx);
+    });
+
+    document.body.appendChild(el);
+    return el;
+  }
+
+  function showQuotePopup(anchorEl, ctx, clientX, clientY) {
+    if (!quotePopup) quotePopup = buildQuotePopup();
+    currentQuoteCtx = ctx;
+
+    const x = clientX + window.scrollX;
+    const y = clientY + window.scrollY - 8;
+    quotePopup.style.transform = `translate(calc(${x}px - 50%), calc(${y}px - 100%))`;
+    quotePopup.classList.add('is-visible');
+
+    document.removeEventListener('click', onQuotePopupOutside);
+    setTimeout(() => document.addEventListener('click', onQuotePopupOutside), 0);
+  }
+
+  function onQuotePopupOutside(e) {
+    if (quotePopup && !quotePopup.contains(e.target)) {
+      hideQuotePopup();
+    }
+  }
+
+  function hideQuotePopup() {
+    quotePopup?.classList.remove('is-visible');
+    currentQuoteCtx = null;
+    document.removeEventListener('click', onQuotePopupOutside);
+  }
+
   function wireNoteActions(app) {
-    // Goto buttons
+    // Goto buttons (footer + quote menu "Apri")
     app.querySelectorAll('[data-czh-goto-id]').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
         window.location.href = buildGotoUrl(
           btn.dataset.czhGotoPermalink,
           Number(btn.dataset.czhGotoPage || 1),
           btn.dataset.czhGotoId
         );
+      });
+    });
+
+    // Quote click → segmented popup (Apri | Copia | Modifica)
+    app.querySelectorAll('.czh-notes__quote--clickable').forEach(quote => {
+      quote.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // In edit mode the quote is a plain blockquote — no popup
+        if (app.classList.contains('czh-edit-mode')) return;
+
+        const id = Number(quote.dataset.czhQuoteId);
+
+        // Toggle: same quote clicked while popup is open → close
+        if (quotePopup?.classList.contains('is-visible') && currentQuoteCtx?.id === id) {
+          hideQuotePopup();
+          return;
+        }
+
+        const item = app.querySelector(`.czh-notes__item[data-id="${id}"]`);
+        if (!item) return;
+        showQuotePopup(quote, {
+          id,
+          text:          quote.textContent,
+          selected_text: quote.textContent,
+          note:          item.querySelector('.czh-notes__annotation')?.textContent || '',
+          color:         item.dataset.color || 'yellow',
+          permalink:     quote.dataset.czhQuotePermalink,
+          pageNum:       Number(quote.dataset.czhQuotePage || 1),
+        }, e.clientX, e.clientY);
       });
     });
 
