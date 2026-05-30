@@ -18,6 +18,11 @@
   // ── State ──────────────────────────────────────────────────────────────────
   let highlights = [];   // loaded from server
   let pending    = null; // { selectedText, prefixText, suffixText }
+  let postNote   = null; // { id, user_id, post_id, note, ... } or null
+
+  // Truncation limits
+  const TRUNC_DRAWER_HL  = 120; // highlight notes in drawer: truncate, no expand
+  const TRUNC_POST_NOTE  = 250; // article note in drawer + page view: truncate with expand
 
   // ── REST ───────────────────────────────────────────────────────────────────
   async function apiFetch(path, { method = 'GET', body } = {}) {
@@ -611,6 +616,120 @@
     currentNoteOverlayHighlightId = null;
   }
 
+  // ── Post note modal (simplified: no colors, no blockquote) ────────────────
+
+  let postNoteModal = null;
+
+  function buildPostNoteModal() {
+    const el = document.createElement('div');
+    el.className = 'czh-note-overlay czh-post-note-overlay';
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-modal', 'true');
+    el.innerHTML = `
+      <div class="czh-note-modal">
+        <div class="czh-note-modal__header czh-note-modal__header--simple">
+          <span class="czh-post-note-modal__title">${escapeHtml(i18n.article_note_title)}</span>
+          <button type="button" class="czh-note-modal__close" aria-label="${escapeAttr(i18n.close)}">
+            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+              <path d="M18 6 6 18M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+        <div class="czh-note-modal__body">
+          <div class="czh-note-modal__note"
+               contenteditable="true"
+               role="textbox"
+               aria-multiline="true"
+               data-placeholder="${escapeAttr(i18n.add_note)}"></div>
+        </div>
+        <div class="czh-note-modal__footer">
+          <button type="button" class="czh-note-modal__delete">${escapeHtml(i18n.delete)}</button>
+          <button type="button" class="czh-note-modal__cancel">${escapeHtml(i18n.cancel)}</button>
+          <button type="button" class="czh-note-modal__ok">${escapeHtml(i18n.save)}</button>
+        </div>
+      </div>`;
+
+    const noteField = el.querySelector('.czh-note-modal__note');
+    noteField.addEventListener('paste', e => {
+      e.preventDefault();
+      const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+      document.execCommand('insertText', false, text);
+    });
+
+    el.querySelector('.czh-note-modal__close').addEventListener('click', hidePostNoteModal);
+    el.querySelector('.czh-note-modal__cancel').addEventListener('click', hidePostNoteModal);
+
+    el.querySelector('.czh-note-modal__ok').addEventListener('click', async () => {
+      if (!ctx?.postId) return;
+      const note = el.querySelector('.czh-note-modal__note').textContent.trim();
+      if (!note) return;
+      try {
+        postNote = await apiFetch('post-note', { method: 'POST', body: { post_id: ctx.postId, note } });
+        renderPostNoteBar();
+        refreshDrawerList();
+      } catch (e) { console.error('[CZH] save post note failed', e); }
+      hidePostNoteModal();
+    });
+
+    el.querySelector('.czh-note-modal__delete').addEventListener('click', async () => {
+      if (!ctx?.postId) return;
+      try {
+        await apiFetch(`post-note/${ctx.postId}`, { method: 'DELETE' });
+        postNote = null;
+        renderPostNoteBar();
+        refreshDrawerList();
+      } catch (e) { console.error('[CZH] delete post note failed', e); }
+      hidePostNoteModal();
+    });
+
+    el.addEventListener('click', e => { if (e.target === el) hidePostNoteModal(); });
+    document.body.appendChild(el);
+    return el;
+  }
+
+  function showPostNoteModal() {
+    if (!postNoteModal) postNoteModal = buildPostNoteModal();
+    const hasNote   = !!(postNote && postNote.note);
+    const noteField = postNoteModal.querySelector('.czh-note-modal__note');
+    const deleteBtn = postNoteModal.querySelector('.czh-note-modal__delete');
+    noteField.textContent   = postNote?.note || '';
+    deleteBtn.style.display = hasNote ? '' : 'none';
+    postNoteModal.classList.add('is-visible');
+    document.body.classList.add('czh-overlay-open');
+    setTimeout(() => noteField.focus(), 100);
+  }
+
+  function hidePostNoteModal() {
+    if (!postNoteModal) return;
+    postNoteModal.classList.remove('is-visible');
+    document.body.classList.remove('czh-overlay-open');
+  }
+
+  // ── Post note bar (bottom of article) ─────────────────────────────────────
+
+  function renderPostNoteBar() {
+    const bar = document.getElementById('czh-post-note-bar');
+    if (!bar) return;
+
+    if (postNote && postNote.note) {
+      bar.innerHTML =
+        `<div class="czh-post-note-bar__label">${escapeHtml(i18n.article_note_label)}</div>` +
+        `<div class="czh-post-note-bar__text">${truncHtml(postNote.note, TRUNC_POST_NOTE, true)}</div>` +
+        `<button type="button" class="czh-post-note-bar__edit-btn">${escapeHtml(i18n.edit_article_note)}</button>`;
+      wireTruncExpand(bar);
+      bar.querySelector('.czh-post-note-bar__edit-btn')
+         .addEventListener('click', showPostNoteModal);
+    } else {
+      bar.innerHTML =
+        `<button type="button" class="czh-post-note-bar__add-btn">` +
+          `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>` +
+          escapeHtml(i18n.add_article_note) +
+        `</button>`;
+      bar.querySelector('.czh-post-note-bar__add-btn')
+         .addEventListener('click', showPostNoteModal);
+    }
+  }
+
   // ── Do Highlight ───────────────────────────────────────────────────────────
 
   function onHighlightRequest() {
@@ -690,29 +809,62 @@
 
     const active = highlights.filter(h => h.status !== 'orphaned');
 
-    if (active.length === 0) {
-      body.innerHTML = `<p class="czh-drawer__empty">${escapeHtml(i18n.no_highlights)}</p>`;
-      return;
+    // ── Post note section ──
+    let postNoteHtml = '';
+    if (postNote && postNote.note) {
+      postNoteHtml = `
+        <div class="czh-drawer__post-note">
+          <div class="czh-drawer__post-note-label">${escapeHtml(i18n.article_note_label)}</div>
+          <div class="czh-drawer__post-note-text">${truncHtml(postNote.note, TRUNC_POST_NOTE, true)}</div>
+          <div class="czh-drawer__post-note-actions">
+            <button type="button" class="czh-drawer__post-note-edit-btn">${escapeHtml(i18n.edit_article_note)}</button>
+          </div>
+        </div>`;
+    } else {
+      postNoteHtml = `<button type="button" class="czh-drawer__add-post-note-btn">${escapeHtml(i18n.add_article_note)}</button>`;
     }
 
-    body.innerHTML = active.map(h => {
-      const pageNum = h.page_num || 1;
-      const samePageMark = pageNum === (ctx.pageNum || 1);
-      return `
-      <div class="czh-drawer__item" data-id="${h.id}" data-color="${escapeAttr(h.color)}">
-        <div class="czh-drawer__item-text">${escapeHtml(h.selected_text)}</div>
-        ${h.note ? `<div class="czh-drawer__item-note">${escapeHtml(h.note)}</div>` : ''}
-        ${h.status === 'displaced' ? `<p class="czh-drawer__item-warning">${escapeHtml(i18n.displaced_msg)}</p>` : ''}
-        <div class="czh-drawer__item-actions">
-          <button type="button" class="czh-drawer__scroll-btn"
-            data-czh-scroll-to="${h.id}"
-            data-czh-goto-permalink="${escapeAttr(ctx.permalink || '')}"
-            data-czh-goto-page="${pageNum}"
-            data-czh-same-page="${samePageMark ? '1' : '0'}">Vai</button>
-          <button type="button" class="czh-drawer__edit-btn" data-czh-edit="${h.id}">${i18n.edit}</button>
-          <button type="button" class="czh-drawer__del-btn" data-czh-delete="${h.id}">${i18n.delete}</button>
-        </div>
-      </div>`; }).join('');
+    // ── Highlights section ──
+    let hlHtml = '';
+    if (active.length === 0) {
+      hlHtml = `<p class="czh-drawer__empty czh-drawer__empty--hl">${escapeHtml(i18n.no_highlights)}</p>`;
+    } else {
+      hlHtml = active.map(h => {
+        const pageNum      = h.page_num || 1;
+        const samePageMark = pageNum === (ctx.pageNum || 1);
+        const noteHtml     = h.note
+          ? `<div class="czh-drawer__item-note">${truncHtml(h.note, TRUNC_DRAWER_HL, false)}</div>`
+          : '';
+        return `
+        <div class="czh-drawer__item" data-id="${h.id}" data-color="${escapeAttr(h.color)}">
+          <div class="czh-drawer__item-text">${escapeHtml(h.selected_text)}</div>
+          ${noteHtml}
+          ${h.status === 'displaced' ? `<p class="czh-drawer__item-warning">${escapeHtml(i18n.displaced_msg)}</p>` : ''}
+          <div class="czh-drawer__item-actions">
+            <button type="button" class="czh-drawer__scroll-btn"
+              data-czh-scroll-to="${h.id}"
+              data-czh-goto-permalink="${escapeAttr(ctx.permalink || '')}"
+              data-czh-goto-page="${pageNum}"
+              data-czh-same-page="${samePageMark ? '1' : '0'}">${escapeHtml(i18n.goto)}</button>
+            <button type="button" class="czh-drawer__edit-btn" data-czh-edit="${h.id}">${escapeHtml(i18n.edit)}</button>
+            <button type="button" class="czh-drawer__del-btn" data-czh-delete="${h.id}">${escapeHtml(i18n.delete)}</button>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    const showDivider = active.length > 0;
+    body.innerHTML = postNoteHtml
+      + (showDivider ? '<hr class="czh-drawer__divider">' : '')
+      + hlHtml;
+
+    wireTruncExpand(body);
+
+    // Post note buttons
+    body.querySelector('.czh-drawer__add-post-note-btn')
+        ?.addEventListener('click', () => { closeDrawer(); setTimeout(showPostNoteModal, 280); });
+    body.querySelector('.czh-drawer__post-note-edit-btn')
+        ?.addEventListener('click', () => { closeDrawer(); setTimeout(showPostNoteModal, 280); });
 
     // Scroll-to / goto buttons
     body.querySelectorAll('[data-czh-scroll-to]').forEach(btn => {
@@ -837,6 +989,49 @@
     return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#039;');
   }
 
+  // ── Truncation helpers ─────────────────────────────────────────────────────
+
+  // Returns HTML with optional expand/collapse controls.
+  // expandable=false → just ellipsis, no button (for drawer highlight notes).
+  function truncHtml(text, maxLen, expandable) {
+    if (!text || text.length <= maxLen) {
+      return `<span>${escapeHtml(text || '')}</span>`;
+    }
+    const short = escapeHtml(text.slice(0, maxLen).trimEnd());
+    if (!expandable) {
+      return `<span>${short}&hellip;</span>`;
+    }
+    return (
+      `<span class="czh-trunc">` +
+        `<span class="czh-trunc__short">${short}&hellip; ` +
+          `<button type="button" class="czh-trunc__expand">${escapeHtml(i18n.expand)}</button>` +
+        `</span>` +
+        `<span class="czh-trunc__full" hidden>${escapeHtml(text)} ` +
+          `<button type="button" class="czh-trunc__collapse">${escapeHtml(i18n.collapse_text)}</button>` +
+        `</span>` +
+      `</span>`
+    );
+  }
+
+  function wireTruncExpand(container) {
+    container.querySelectorAll('.czh-trunc__expand').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const trunc = btn.closest('.czh-trunc');
+        if (!trunc) return;
+        trunc.querySelector('.czh-trunc__short').hidden = true;
+        trunc.querySelector('.czh-trunc__full').hidden  = false;
+      });
+    });
+    container.querySelectorAll('.czh-trunc__collapse').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const trunc = btn.closest('.czh-trunc');
+        if (!trunc) return;
+        trunc.querySelector('.czh-trunc__full').hidden  = true;
+        trunc.querySelector('.czh-trunc__short').hidden = false;
+      });
+    });
+  }
+
   // ── Notes page ─────────────────────────────────────────────────────────────
 
   function initNotesPage() {
@@ -922,7 +1117,13 @@
   async function renderVolumeDetail(app, volumeId) {
     app.innerHTML = `<p class="czh-notes__loading">${escapeHtml(i18n.loading)}</p>`;
     try {
-      const rows = await apiFetch(`highlights/volume?volume_id=${volumeId}`);
+      // Load highlights and article notes in parallel
+      const [hlRes, pnRes] = await Promise.allSettled([
+        apiFetch(`highlights/volume?volume_id=${volumeId}`),
+        apiFetch(`post-notes/volume?volume_id=${volumeId}`),
+      ]);
+      const rows   = hlRes.status === 'fulfilled' ? hlRes.value : [];
+      const pnotes = pnRes.status === 'fulfilled' ? pnRes.value : [];
 
       const backBtn = `
         <div class="czh-notes__detail-header">
@@ -936,7 +1137,34 @@
           </div>
         </div>`;
 
-      if (!rows.length) {
+      // Group highlights by post_id preserving server order
+      const byPost    = {};
+      const postOrder = [];
+      rows.filter(h => h.status !== 'orphaned').forEach(h => {
+        const pid = h.post_id;
+        if (!byPost[pid]) {
+          byPost[pid] = { post: h.post, items: [], postNote: null };
+          postOrder.push(pid);
+        }
+        byPost[pid].items.push(h);
+      });
+
+      // Merge article notes: attach to existing groups or create new entries
+      const postOrderSet = new Set(postOrder);
+      pnotes.forEach(pn => {
+        if (postOrderSet.has(pn.post_id)) {
+          byPost[pn.post_id].postNote = pn;
+        } else {
+          byPost[pn.post_id] = {
+            post: { title: pn.post_title, permalink: pn.post_permalink },
+            items: [],
+            postNote: pn,
+          };
+          postOrder.push(pn.post_id);
+        }
+      });
+
+      if (!postOrder.length) {
         app.innerHTML = backBtn + `<p class="czh-notes__empty">${escapeHtml(i18n.no_notes_volume)}</p>`;
         app.classList.remove('czh-edit-mode');
         wireBackButton(app);
@@ -944,26 +1172,19 @@
         return;
       }
 
-      // Group highlights by post_id preserving server order
-      const byPost = {};
-      const postOrder = [];
-      rows.filter(h => h.status !== 'orphaned').forEach(h => {
-        const pid = h.post_id;
-        if (!byPost[pid]) {
-          byPost[pid] = { post: h.post, items: [] };
-          postOrder.push(pid);
-        }
-        byPost[pid].items.push(h);
-      });
-
-      let articlesHtml = postOrder.map(pid => {
-        const { post, items } = byPost[pid];
-        const title = post ? post.title : '—';
+      const articlesHtml = postOrder.map(pid => {
+        const { post, items, postNote } = byPost[pid];
+        const title        = post ? post.title : '—';
+        const postNoteHtml = postNote ? buildPostNoteItemHtml(postNote) : '';
+        const itemsHtml    = items.length
+          ? `<div class="czh-notes__items">${items.map(h => buildNoteItemHtml(h)).join('')}</div>`
+          : '';
         return `
           <div class="collapsable-section" data-initial="open">
             <h3 class="collapsable-toggle">${escapeHtml(title)}</h3>
             <div class="collapsable-content">
-              <div class="czh-notes__items">${items.map(h => buildNoteItemHtml(h)).join('')}</div>
+              ${postNoteHtml}
+              ${itemsHtml}
             </div>
           </div>`;
       }).join('');
@@ -974,6 +1195,7 @@
       wireCollapseAllBtn(app);
       wireEditToggleBtn(app);
       wireNoteActions(app);
+      wirePostNoteActions(app);
     } catch (e) {
       console.error('[CZH] volume detail failed', e);
       app.innerHTML = `<p class="czh-notes__empty">${escapeHtml(i18n.error_loading)}</p>`;
@@ -983,7 +1205,13 @@
   async function renderStandaloneDetail(app) {
     app.innerHTML = `<p class="czh-notes__loading">${escapeHtml(i18n.loading)}</p>`;
     try {
-      const rows = await apiFetch('highlights/standalone');
+      // Load highlights and article notes in parallel
+      const [hlRes, pnRes] = await Promise.allSettled([
+        apiFetch('highlights/standalone'),
+        apiFetch('post-notes/standalone'),
+      ]);
+      const rows   = hlRes.status === 'fulfilled' ? hlRes.value : [];
+      const pnotes = pnRes.status === 'fulfilled' ? pnRes.value : [];
 
       const backBtn = `
         <div class="czh-notes__detail-header">
@@ -997,7 +1225,34 @@
           </div>
         </div>`;
 
-      if (!rows.length) {
+      // Group highlights by post_id preserving server order
+      const byPost    = {};
+      const postOrder = [];
+      rows.filter(h => h.status !== 'orphaned').forEach(h => {
+        const pid = h.post_id;
+        if (!byPost[pid]) {
+          byPost[pid] = { post: h.post, items: [], postNote: null };
+          postOrder.push(pid);
+        }
+        byPost[pid].items.push(h);
+      });
+
+      // Merge article notes: attach to existing groups or create new entries
+      const postOrderSet = new Set(postOrder);
+      pnotes.forEach(pn => {
+        if (postOrderSet.has(pn.post_id)) {
+          byPost[pn.post_id].postNote = pn;
+        } else {
+          byPost[pn.post_id] = {
+            post: { title: pn.post_title, permalink: pn.post_permalink },
+            items: [],
+            postNote: pn,
+          };
+          postOrder.push(pn.post_id);
+        }
+      });
+
+      if (!postOrder.length) {
         app.innerHTML = backBtn + `<p class="czh-notes__empty">${escapeHtml(i18n.no_notes_volume)}</p>`;
         app.classList.remove('czh-edit-mode');
         wireBackButton(app);
@@ -1005,25 +1260,19 @@
         return;
       }
 
-      const byPost = {};
-      const postOrder = [];
-      rows.filter(h => h.status !== 'orphaned').forEach(h => {
-        const pid = h.post_id;
-        if (!byPost[pid]) {
-          byPost[pid] = { post: h.post, items: [] };
-          postOrder.push(pid);
-        }
-        byPost[pid].items.push(h);
-      });
-
       const articlesHtml = postOrder.map(pid => {
-        const { post, items } = byPost[pid];
-        const title = post ? post.title : '—';
+        const { post, items, postNote } = byPost[pid];
+        const title        = post ? post.title : '—';
+        const postNoteHtml = postNote ? buildPostNoteItemHtml(postNote) : '';
+        const itemsHtml    = items.length
+          ? `<div class="czh-notes__items">${items.map(h => buildNoteItemHtml(h)).join('')}</div>`
+          : '';
         return `
           <div class="collapsable-section" data-initial="open">
             <h3 class="collapsable-toggle">${escapeHtml(title)}</h3>
             <div class="collapsable-content">
-              <div class="czh-notes__items">${items.map(h => buildNoteItemHtml(h)).join('')}</div>
+              ${postNoteHtml}
+              ${itemsHtml}
             </div>
           </div>`;
       }).join('');
@@ -1034,6 +1283,7 @@
       wireCollapseAllBtn(app);
       wireEditToggleBtn(app);
       wireNoteActions(app);
+      wirePostNoteActions(app);
     } catch (e) {
       console.error('[CZH] standalone detail failed', e);
       app.innerHTML = `<p class="czh-notes__empty">${escapeHtml(i18n.error_loading)}</p>`;
@@ -1142,6 +1392,129 @@
           </div>
         </div>
       </div>`;
+  }
+
+  // ── Post note item for Page View ──────────────────────────────────────────
+
+  function buildPostNoteItemHtml(pn) {
+    const postId   = pn.post_id;
+    const noteId   = pn.id;
+    const noteHtml = truncHtml(pn.note, TRUNC_POST_NOTE, true);
+    return `
+      <div class="czh-notes__post-note" data-post-id="${postId}" data-note-id="${noteId}">
+        <div class="czh-notes__post-note-read">
+          <p class="czh-notes__post-note-text">${noteHtml}</p>
+          <div class="czh-notes__post-note-footer">
+            <button type="button" class="czh-notes__edit-btn" data-czh-pn-edit="${postId}">${escapeHtml(i18n.edit)}</button>
+            <button type="button" class="czh-notes__del-btn" data-czh-pn-del="${postId}">${escapeHtml(i18n.delete)}</button>
+          </div>
+        </div>
+        <div class="czh-notes__post-note-edit" hidden>
+          <textarea class="czh-notes__edit-textarea" rows="4">${escapeHtml(pn.note)}</textarea>
+          <div class="czh-notes__post-note-footer">
+            <button type="button" class="czh-notes__save-btn" data-czh-pn-save="${postId}">${escapeHtml(i18n.save)}</button>
+            <button type="button" class="czh-notes__cancel-btn" data-czh-pn-cancel="${postId}">${escapeHtml(i18n.cancel)}</button>
+          </div>
+        </div>
+        <div class="czh-notes__post-note-confirm" hidden>
+          <p class="czh-notes__confirm-msg">${escapeHtml(i18n.confirm_delete)}</p>
+          <div class="czh-notes__post-note-footer">
+            <button type="button" class="czh-notes__del-btn" data-czh-pn-confirm-del="${postId}">${escapeHtml(i18n.delete)}</button>
+            <button type="button" class="czh-notes__cancel-btn" data-czh-pn-cancel-del="${postId}">${escapeHtml(i18n.cancel)}</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function wirePostNoteActions(app) {
+    wireTruncExpand(app);
+
+    // Edit → show inline textarea
+    app.querySelectorAll('[data-czh-pn-edit]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const postId = Number(btn.dataset.czhPnEdit);
+        const item   = app.querySelector(`.czh-notes__post-note[data-post-id="${postId}"]`);
+        if (!item) return;
+        item.querySelector('.czh-notes__post-note-read').hidden = true;
+        item.querySelector('.czh-notes__post-note-edit').hidden = false;
+        item.querySelector('.czh-notes__post-note-edit textarea')?.focus();
+      });
+    });
+
+    // Cancel edit
+    app.querySelectorAll('[data-czh-pn-cancel]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const postId = Number(btn.dataset.czhPnCancel);
+        const item   = app.querySelector(`.czh-notes__post-note[data-post-id="${postId}"]`);
+        if (!item) return;
+        item.querySelector('.czh-notes__post-note-read').hidden = false;
+        item.querySelector('.czh-notes__post-note-edit').hidden = true;
+      });
+    });
+
+    // Save
+    app.querySelectorAll('[data-czh-pn-save]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const postId = Number(btn.dataset.czhPnSave);
+        const item   = app.querySelector(`.czh-notes__post-note[data-post-id="${postId}"]`);
+        if (!item) return;
+        const note = item.querySelector('.czh-notes__post-note-edit textarea')?.value.trim() || '';
+        if (!note) return;
+        try {
+          const updated = await apiFetch('post-note', { method: 'POST', body: { post_id: postId, note } });
+          const readEl  = item.querySelector('.czh-notes__post-note-read');
+          const textEl  = readEl.querySelector('.czh-notes__post-note-text');
+          textEl.innerHTML = truncHtml(updated.note, TRUNC_POST_NOTE, true);
+          wireTruncExpand(textEl);
+          item.querySelector('.czh-notes__post-note-edit textarea').value = updated.note;
+          readEl.hidden = false;
+          item.querySelector('.czh-notes__post-note-edit').hidden = true;
+        } catch (e) { console.error('[CZH] save post note failed', e); }
+      });
+    });
+
+    // Delete → show confirm panel
+    app.querySelectorAll('[data-czh-pn-del]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const postId = Number(btn.dataset.czhPnDel);
+        const item   = app.querySelector(`.czh-notes__post-note[data-post-id="${postId}"]`);
+        if (!item) return;
+        item.querySelector('.czh-notes__post-note-read').hidden    = true;
+        item.querySelector('.czh-notes__post-note-confirm').hidden = false;
+      });
+    });
+
+    // Confirm delete
+    app.querySelectorAll('[data-czh-pn-confirm-del]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const postId = Number(btn.dataset.czhPnConfirmDel);
+        try {
+          await apiFetch(`post-note/${postId}`, { method: 'DELETE' });
+          const item      = app.querySelector(`.czh-notes__post-note[data-post-id="${postId}"]`);
+          const sectionEl = item?.closest('.collapsable-section');
+          item?.remove();
+          // Remove section only if no highlights remain either
+          if (sectionEl && !sectionEl.querySelector('.czh-notes__item') && !sectionEl.querySelector('.czh-notes__post-note')) {
+            sectionEl.remove();
+          }
+          if (!app.querySelector('.czh-notes__item') && !app.querySelector('.czh-notes__post-note')) {
+            const body = app.querySelector('.czh-notes__articles');
+            if (body) body.innerHTML = `<p class="czh-notes__empty">${escapeHtml(i18n.no_notes_volume)}</p>`;
+          }
+        } catch (e) { console.error('[CZH] delete post note failed', e); }
+      });
+    });
+
+    // Cancel delete confirm
+    app.querySelectorAll('[data-czh-pn-cancel-del]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const postId = Number(btn.dataset.czhPnCancelDel);
+        const item   = app.querySelector(`.czh-notes__post-note[data-post-id="${postId}"]`);
+        if (!item) return;
+        item.querySelector('.czh-notes__post-note-confirm').hidden = true;
+        item.querySelector('.czh-notes__post-note-read').hidden    = false;
+      });
+    });
   }
 
   // ── Quote popup (segmented pill: Apri | Copia | Modifica) ─────────────────
@@ -1349,9 +1722,10 @@
           const sectionEl = item.closest('.collapsable-section');
           item.remove();
           if (itemsEl && !itemsEl.querySelector('.czh-notes__item')) {
-            sectionEl?.remove();
+            // Only remove section if there is also no article note
+            if (!sectionEl?.querySelector('.czh-notes__post-note')) sectionEl?.remove();
           }
-          if (!app.querySelector('.czh-notes__item')) {
+          if (!app.querySelector('.czh-notes__item') && !app.querySelector('.czh-notes__post-note')) {
             const body = app.querySelector('.czh-notes__articles');
             if (body) body.innerHTML = `<p class="czh-notes__empty">${escapeHtml(i18n.no_notes_volume)}</p>`;
           }
@@ -1420,13 +1794,16 @@
 
     if (!isArticle) return; // nothing more to set up on non-article pages
 
-    // Load highlights for this article
-    try {
-      highlights = await apiFetch(`highlights?post_id=${ctx.postId}`);
-    } catch (e) {
-      console.error('[CZH] load failed', e);
-      highlights = [];
-    }
+    // Load highlights and article note in parallel
+    const [hlRes, pnRes] = await Promise.allSettled([
+      apiFetch(`highlights?post_id=${ctx.postId}`),
+      apiFetch(`post-note?post_id=${ctx.postId}`),
+    ]);
+    highlights = hlRes.status === 'fulfilled' ? hlRes.value : [];
+    if (hlRes.status !== 'fulfilled') console.error('[CZH] highlights load failed', hlRes.reason);
+    postNote = pnRes.status === 'fulfilled' ? pnRes.value : null;
+
+    renderPostNoteBar();
 
     // Render only highlights belonging to the current paginated page
     const currentPage = ctx.pageNum || 1;
@@ -1482,13 +1859,18 @@
         return;
       }
 
-      body.innerHTML = rows.map(h => `
+      body.innerHTML = rows.map(h => {
+        const noteHtml = h.note
+          ? `<div class="czh-drawer__item-note">${truncHtml(h.note, TRUNC_DRAWER_HL, false)}</div>`
+          : '';
+        return `
         <div class="czh-drawer__item" data-id="${h.id}" data-color="${escapeAttr(h.color)}">
           ${h.post ? `<div class="czh-drawer__item-post"><a href="${escapeAttr(h.post.permalink)}">${escapeHtml(h.post.title)}</a></div>` : ''}
           <div class="czh-drawer__item-text">${escapeHtml(h.selected_text)}</div>
-          ${h.note ? `<div class="czh-drawer__item-note">${escapeHtml(h.note)}</div>` : ''}
-          ${h.post ? `<div class="czh-drawer__item-actions"><button type="button" class="czh-drawer__scroll-btn" data-czh-goto-permalink="${escapeAttr(h.post.permalink)}" data-czh-goto-page="${h.page_num || 1}" data-czh-goto-id="${h.id}">Vai</button></div>` : ''}
-        </div>`).join('');
+          ${noteHtml}
+          ${h.post ? `<div class="czh-drawer__item-actions"><button type="button" class="czh-drawer__scroll-btn" data-czh-goto-permalink="${escapeAttr(h.post.permalink)}" data-czh-goto-page="${h.page_num || 1}" data-czh-goto-id="${h.id}">${escapeHtml(i18n.goto)}</button></div>` : ''}
+        </div>`;
+      }).join('');
 
       body.querySelectorAll('[data-czh-goto-id]').forEach(btn => {
         btn.addEventListener('click', () => {

@@ -34,6 +34,7 @@ final class CZ_Highlights {
 
 	public static function activate() {
 		CZH_DB::create_table();
+		CZH_PostNotes_DB::create_table();
 		self::ensure_notes_page();
 	}
 
@@ -60,11 +61,13 @@ final class CZ_Highlights {
 	}
 
 	private function __construct() {
+		add_action( 'init',                    [ $this, 'maybe_upgrade_db' ] );
 		add_action( 'rest_api_init',           [ 'CZH_REST', 'register_routes' ] );
 		add_action( 'wp_enqueue_scripts',      [ $this, 'enqueue_assets' ] );
 		add_action( 'wp_footer',               [ $this, 'print_drawer' ] );
 		add_action( 'czh_nav_user_menu_items', [ $this, 'render_nav_menu_item' ] );
 		add_filter( 'body_class',              [ $this, 'add_body_classes' ] );
+		add_filter( 'the_content',             [ $this, 'append_post_note_bar' ] );
 		add_shortcode( 'czh_my_notes',         [ $this, 'render_notes_shortcode' ] );
 	}
 
@@ -164,9 +167,15 @@ final class CZ_Highlights {
 					'no_notes_any'    => __( 'Nessuna nota ancora.', 'cz-highlights' ),
 					'goto'            => __( 'Vai', 'cz-highlights' ),
 					'error_loading'    => __( 'Errore nel caricamento.', 'cz-highlights' ),
-					'standalone_title' => __( 'Note sparse', 'cz-highlights' ),
-					'collapse_all'     => __( 'Comprimi', 'cz-highlights' ),
-					'expand_all'       => __( 'Espandi', 'cz-highlights' ),
+					'standalone_title'    => __( 'Note sparse', 'cz-highlights' ),
+					'collapse_all'        => __( 'Comprimi', 'cz-highlights' ),
+					'expand_all'          => __( 'Espandi', 'cz-highlights' ),
+					'add_article_note'    => __( 'Aggiungi nota', 'cz-highlights' ),
+					'edit_article_note'   => __( 'Modifica nota', 'cz-highlights' ),
+					'article_note_title'  => __( "Nota sull'articolo", 'cz-highlights' ),
+					'article_note_label'  => __( 'Considerazioni Personali', 'cz-highlights' ),
+					'expand'              => __( 'Mostra tutto', 'cz-highlights' ),
+					'collapse_text'       => __( 'Riduci', 'cz-highlights' ),
 				],
 			];
 		} else {
@@ -253,6 +262,28 @@ final class CZ_Highlights {
 		);
 
 		return $volume_id ? (int) $volume_id : null;
+	}
+
+	/** ---- DB upgrade ---- */
+
+	public function maybe_upgrade_db() {
+		if ( get_option( 'czh_db_version' ) !== CZH_VERSION ) {
+			CZH_PostNotes_DB::create_table();
+			update_option( 'czh_db_version', CZH_VERSION );
+		}
+	}
+
+	/** ---- Post note bar (appended after article content) ---- */
+
+	public function append_post_note_bar( $content ) {
+		if ( ! is_singular( 'post' ) || ! is_user_logged_in() || ! $this->highlights_enabled() ) {
+			return $content;
+		}
+		if ( ! in_the_loop() || ! is_main_query() ) {
+			return $content;
+		}
+		$content .= '<div id="czh-post-note-bar" class="czh-post-note-bar" aria-live="polite"></div>';
+		return $content;
 	}
 
 	/** ---- Drawer HTML ---- */

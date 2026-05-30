@@ -1019,3 +1019,181 @@ body.czh-overlay-open { overflow: hidden; }
   .czh-tooltip,
   .czh-popover { transition: none; }
 }
+
+/* ── Truncation expand/collapse ───────────────────────────────────────────── */
+
+.czh-trunc__expand,
+.czh-trunc__collapse {
+  display: inline;
+  appearance: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--czh-text-muted);
+  font-size: .8em;
+  font-family: inherit;
+  padding: 0 0 0 .25em;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color .12s ease;
+}
+
+.czh-trunc__expand:hover,
+.czh-trunc__collapse:hover { color: var(--czh-text); }
+
+/* ── Post note modal (simplified, no colors/quote) ────────────────────────── */
+
+.czh-note-modal__header--simple {
+  justify-content: space-between;
+}
+
+.czh-post-note-modal__title {
+  font-size: .9rem;
+  font-weight: 600;
+  color: var(--czh-text);
+}
+
+/* ── Post note bar (bottom of article) ───────────────────────────────────── */
+
+.czh-post-note-bar {
+  margin-top: 2.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--czh-surface-border);
+  min-height: 1px; /* prevent collapse before JS populates */
+}
+
+.czh-post-note-bar__label {
+  font-size: .72rem;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--czh-text-muted);
+  margin-bottom: .4rem;
+}
+
+.czh-post-note-bar__text {
+  font-style: italic;
+  font-size: 1.05em;
+  color: var(--czh-text);
+  line-height: var(--lh-base, 1.68);
+  margin: 0 0 .75rem;
+}
+
+.czh-post-note-bar__add-btn,
+.czh-post-note-bar__edit-btn {
+  appearance: none;
+  background: none;
+  border: 1px solid currentColor;
+  border-radius: 99px;
+  cursor: pointer;
+  color: var(--czh-text-muted);
+  font-size: .8rem;
+  font-family: inherit;
+  padding: .35rem .9rem;
+  line-height: 1.4;
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  transition: background-color .15s, color .15s;
+}
+
+.czh-post-note-bar__add-btn:hover,
+.czh-post-note-bar__edit-btn:hover {
+  background-color: rgba(128,128,128,.12);
+  color: var(--czh-text);
+}
+
+/* ── Drawer post note section ─────────────────────────────────────────────── */
+
+.czh-drawer__post-note {
+  padding-bottom: .65rem;
+}
+
+.czh-drawer__post-note-label {
+  font-size: .7rem;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--czh-text-muted);
+  margin-bottom: .3rem;
+}
+
+.czh-drawer__post-note-text {
+  font-size: .875rem;
+  color: var(--czh-text);
+  line-height: 1.55;
+  margin-bottom: .4rem;
+}
+
+.czh-drawer__post-note-actions {
+  display: flex;
+  gap: .4rem;
+}
+
+.czh-drawer__post-note-edit-btn {
+  appearance: none;
+  background: none;
+  border: 1px solid currentColor;
+  border-radius: 99px;
+  cursor: pointer;
+  font-size: .75rem;
+  font-family: inherit;
+  padding: .2rem .65rem;
+  line-height: 1.4;
+  color: var(--czh-text-muted);
+  transition: background-color .15s, color .15s;
+}
+
+.czh-drawer__post-note-edit-btn:hover { background-color: rgba(128,128,128,.12); }
+
+.czh-drawer__add-post-note-btn {
+  appearance: none;
+  background: none;
+  border: 1px dashed var(--czh-surface-border);
+  border-radius: var(--czh-radius);
+  cursor: pointer;
+  color: var(--czh-text-muted);
+  font-size: .8rem;
+  font-family: inherit;
+  padding: .5rem .75rem;
+  width: 100%;
+  text-align: left;
+  transition: border-color .15s, color .15s;
+}
+
+.czh-drawer__add-post-note-btn:hover {
+  border-color: var(--czh-text-muted);
+  color: var(--czh-text);
+}
+
+.czh-drawer__divider {
+  border: none;
+  border-top: 1px solid var(--czh-surface-border);
+  margin: .25rem 0;
+}
+
+/* ── Page View: post note item inside collapsable ─────────────────────────── */
+
+.czh-notes__post-note {
+  padding: .5rem 0 1rem;
+  border-bottom: 1px solid rgba(128,128,128,.15);
+  margin-bottom: .5rem;
+}
+
+.czh-notes__post-note-text {
+  font-style: italic;
+  font-size: 1.05em;
+  color: var(--czh-text);
+  line-height: var(--lh-base, 1.68);
+  margin: 0 0 .4rem;
+}
+
+.czh-notes__post-note-footer {
+  display: flex;
+  gap: .4rem;
+  margin-top: .45rem;
+}
+
+/* Action buttons hidden by default; shown only in edit mode */
+#czh-notes-app .czh-notes__post-note-read .czh-notes__post-note-footer { display: none; }
+#czh-notes-app.czh-edit-mode .czh-notes__post-note-read .czh-notes__post-note-footer { display: flex; }

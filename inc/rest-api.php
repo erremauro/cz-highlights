@@ -82,6 +82,67 @@ class CZH_REST {
 				],
 			],
 		] );
+
+		// GET  /post-note?post_id=X   → get article note for current user
+		// POST /post-note              → upsert (body: {post_id, note})
+		register_rest_route( self::NAMESPACE, '/post-note', [
+			[
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => [ __CLASS__, 'get_post_note' ],
+				'permission_callback' => [ __CLASS__, 'require_login' ],
+				'args'                => [
+					'post_id' => [
+						'required'          => true,
+						'validate_callback' => fn( $v ) => is_numeric( $v ) && (int) $v > 0,
+						'sanitize_callback' => 'absint',
+					],
+				],
+			],
+			[
+				'methods'             => WP_REST_Server::CREATABLE,
+				'callback'            => [ __CLASS__, 'upsert_post_note' ],
+				'permission_callback' => [ __CLASS__, 'require_login' ],
+				'args'                => [
+					'post_id' => [ 'required' => true, 'sanitize_callback' => 'absint' ],
+					'note'    => [ 'required' => true ],
+				],
+			],
+		] );
+
+		// DELETE /post-note/{post_id}
+		register_rest_route( self::NAMESPACE, '/post-note/(?P<post_id>\d+)', [
+			'methods'             => WP_REST_Server::DELETABLE,
+			'callback'            => [ __CLASS__, 'delete_post_note' ],
+			'permission_callback' => [ __CLASS__, 'require_login' ],
+		] );
+
+		// GET /post-notes/volume?volume_id=X → all article notes for a volume's posts
+		register_rest_route( self::NAMESPACE, '/post-notes/volume', [
+			'methods'             => WP_REST_Server::READABLE,
+			'callback'            => [ __CLASS__, 'get_post_notes_for_volume' ],
+			'permission_callback' => [ __CLASS__, 'require_login' ],
+			'args'                => [
+				'volume_id' => [
+					'required'          => true,
+					'validate_callback' => fn( $v ) => is_numeric( $v ) && (int) $v > 0,
+					'sanitize_callback' => 'absint',
+				],
+			],
+		] );
+
+		// GET /post-notes/standalone → article notes for posts not in any volume
+		register_rest_route( self::NAMESPACE, '/post-notes/standalone', [
+			'methods'             => WP_REST_Server::READABLE,
+			'callback'            => [ __CLASS__, 'get_post_notes_standalone' ],
+			'permission_callback' => [ __CLASS__, 'require_login' ],
+		] );
+
+		// GET /post-notes?post_ids=1,2,3  → bulk get (kept for legacy use)
+		register_rest_route( self::NAMESPACE, '/post-notes', [
+			'methods'             => WP_REST_Server::READABLE,
+			'callback'            => [ __CLASS__, 'get_post_notes_bulk' ],
+			'permission_callback' => [ __CLASS__, 'require_login' ],
+		] );
 	}
 
 	public static function require_login() {
@@ -181,28 +242,51 @@ class CZH_REST {
 		global $wpdb;
 
 		$user_id     = get_current_user_id();
-		$table       = CZH_DB::table_name();
+		$hl_table    = CZH_DB::table_name();
+		$pn_table    = CZH_PostNotes_DB::table_name();
 		$items_table = $wpdb->prefix . 'cz_volume_items';
 
 		if ( $wpdb->get_var( "SHOW TABLES LIKE '{$items_table}'" ) !== $items_table ) {
 			return rest_ensure_response( [] );
 		}
 
-		$rows = $wpdb->get_results(
+		// Highlights per volume
+		$hl_rows = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT vi.volume_id, COUNT(h.id) AS cnt
-				 FROM {$table} h
+				 FROM {$hl_table} h
 				 JOIN {$items_table} vi ON vi.post_id = h.post_id
 				 WHERE h.user_id = %d
-				 GROUP BY vi.volume_id
-				 ORDER BY cnt DESC",
+				 GROUP BY vi.volume_id",
 				$user_id
 			)
 		);
 
+		// Article notes per volume
+		$pn_rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT vi.volume_id, COUNT(pn.id) AS cnt
+				 FROM {$pn_table} pn
+				 JOIN {$items_table} vi ON vi.post_id = pn.post_id
+				 WHERE pn.user_id = %d
+				 GROUP BY vi.volume_id",
+				$user_id
+			)
+		);
+
+		// Merge counts by volume_id
+		$volumes = [];
+		foreach ( $hl_rows as $row ) {
+			$vid = (int) $row->volume_id;
+			$volumes[ $vid ] = ( $volumes[ $vid ] ?? 0 ) + (int) $row->cnt;
+		}
+		foreach ( $pn_rows as $row ) {
+			$vid = (int) $row->volume_id;
+			$volumes[ $vid ] = ( $volumes[ $vid ] ?? 0 ) + (int) $row->cnt;
+		}
+
 		$out = [];
-		foreach ( $rows as $row ) {
-			$vid    = (int) $row->volume_id;
+		foreach ( $volumes as $vid => $count ) {
 			$volume = get_post( $vid );
 			if ( ! $volume || 'volume' !== $volume->post_type ) {
 				continue;
@@ -218,27 +302,36 @@ class CZH_REST {
 				'title'       => get_the_title( $volume ),
 				'permalink'   => get_permalink( $volume ),
 				'author_name' => $author_name,
-				'count'       => (int) $row->cnt,
+				'count'       => $count,
 			];
 		}
 
-		// Prepend standalone card if any highlights exist outside volumes
-		$standalone_count = (int) $wpdb->get_var(
+		// Sort by count descending
+		usort( $out, fn( $a, $b ) => $b['count'] - $a['count'] );
+
+		// Standalone: highlights + article notes on posts outside any volume
+		$hl_standalone = (int) $wpdb->get_var(
 			$wpdb->prepare(
-				"SELECT COUNT(h.id) FROM {$table} h
-				 WHERE h.user_id = %d
-				 AND h.post_id NOT IN ( SELECT post_id FROM {$items_table} )",
+				"SELECT COUNT(h.id) FROM {$hl_table} h
+				 WHERE h.user_id = %d AND h.post_id NOT IN (SELECT post_id FROM {$items_table})",
+				$user_id
+			)
+		);
+		$pn_standalone = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(pn.id) FROM {$pn_table} pn
+				 WHERE pn.user_id = %d AND pn.post_id NOT IN (SELECT post_id FROM {$items_table})",
 				$user_id
 			)
 		);
 
-		if ( $standalone_count > 0 ) {
+		if ( $hl_standalone + $pn_standalone > 0 ) {
 			array_unshift( $out, [
 				'volume_id'   => 0,
 				'title'       => null,
 				'permalink'   => null,
 				'author_name' => null,
-				'count'       => $standalone_count,
+				'count'       => $hl_standalone + $pn_standalone,
 				'standalone'  => true,
 			] );
 		}
@@ -352,6 +445,131 @@ class CZH_REST {
 		}
 
 		return rest_ensure_response( $out );
+	}
+
+	// ---- Post-note handlers ----
+
+	public static function get_post_note( WP_REST_Request $req ) {
+		$user_id = get_current_user_id();
+		$post_id = (int) $req->get_param( 'post_id' );
+		if ( ! self::post_is_readable( $post_id ) ) {
+			return new WP_Error( 'czh_not_found', 'Post not found', [ 'status' => 404 ] );
+		}
+		$row = CZH_PostNotes_DB::get( $user_id, $post_id );
+		return rest_ensure_response( CZH_PostNotes_DB::prepare_row( $row ) );
+	}
+
+	public static function upsert_post_note( WP_REST_Request $req ) {
+		$user_id = get_current_user_id();
+		$post_id = (int) $req->get_param( 'post_id' );
+		if ( ! self::post_is_readable( $post_id ) ) {
+			return new WP_Error( 'czh_not_found', 'Post not found', [ 'status' => 404 ] );
+		}
+		$note = trim( (string) $req->get_param( 'note' ) );
+		if ( mb_strlen( $note ) === 0 ) {
+			return new WP_Error( 'czh_invalid', 'Note cannot be empty', [ 'status' => 400 ] );
+		}
+		$row = CZH_PostNotes_DB::upsert( $user_id, $post_id, $note );
+		return rest_ensure_response( CZH_PostNotes_DB::prepare_row( $row ) );
+	}
+
+	public static function delete_post_note( WP_REST_Request $req ) {
+		$user_id = get_current_user_id();
+		$post_id = (int) $req->get_param( 'post_id' );
+		CZH_PostNotes_DB::delete( $user_id, $post_id );
+		return rest_ensure_response( [ 'deleted' => true, 'post_id' => $post_id ] );
+	}
+
+	public static function get_post_notes_for_volume( WP_REST_Request $req ) {
+		global $wpdb;
+
+		$user_id   = get_current_user_id();
+		$volume_id = (int) $req->get_param( 'volume_id' );
+
+		$volume = get_post( $volume_id );
+		if ( ! $volume || 'volume' !== $volume->post_type ) {
+			return new WP_Error( 'czh_not_found', 'Volume not found', [ 'status' => 404 ] );
+		}
+		if ( 'publish' !== $volume->post_status && ! current_user_can( 'edit_post', $volume_id ) ) {
+			return new WP_Error( 'czh_not_found', 'Volume not found', [ 'status' => 404 ] );
+		}
+
+		$items_table = $wpdb->prefix . 'cz_volume_items';
+		$post_ids    = $wpdb->get_col(
+			$wpdb->prepare( "SELECT post_id FROM {$items_table} WHERE volume_id = %d", $volume_id )
+		);
+
+		if ( empty( $post_ids ) ) {
+			return rest_ensure_response( [] );
+		}
+
+		$post_ids = array_map( 'intval', $post_ids );
+		$rows     = CZH_PostNotes_DB::get_by_posts( $user_id, $post_ids );
+
+		$out = [];
+		foreach ( $rows as $row ) {
+			$prepared = CZH_PostNotes_DB::prepare_row( $row );
+			$p        = get_post( $prepared['post_id'] );
+			$prepared['post_title']     = $p ? get_the_title( $p ) : '';
+			$prepared['post_permalink'] = $p ? get_permalink( $p ) : '';
+			$out[] = $prepared;
+		}
+
+		return rest_ensure_response( $out );
+	}
+
+	public static function get_post_notes_standalone( WP_REST_Request $req ) {
+		global $wpdb;
+
+		$user_id     = get_current_user_id();
+		$pn_table    = CZH_PostNotes_DB::table_name();
+		$items_table = $wpdb->prefix . 'cz_volume_items';
+
+		$items_table_exists = $wpdb->get_var( "SHOW TABLES LIKE '{$items_table}'" ) === $items_table;
+
+		if ( $items_table_exists ) {
+			// phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+			$rows = $wpdb->get_results(
+				$wpdb->prepare(
+					"SELECT * FROM {$pn_table} WHERE user_id = %d AND post_id NOT IN (SELECT post_id FROM {$items_table}) ORDER BY post_id ASC",
+					$user_id
+				),
+				ARRAY_A
+			);
+		} else {
+			$rows = $wpdb->get_results(
+				$wpdb->prepare(
+					"SELECT * FROM {$pn_table} WHERE user_id = %d ORDER BY post_id ASC",
+					$user_id
+				),
+				ARRAY_A
+			);
+		}
+
+		$out = [];
+		foreach ( $rows as $row ) {
+			$prepared = CZH_PostNotes_DB::prepare_row( $row );
+			$p        = get_post( $prepared['post_id'] );
+			$prepared['post_title']     = $p ? get_the_title( $p ) : '';
+			$prepared['post_permalink'] = $p ? get_permalink( $p ) : '';
+			$out[] = $prepared;
+		}
+
+		return rest_ensure_response( $out );
+	}
+
+	public static function get_post_notes_bulk( WP_REST_Request $req ) {
+		$user_id      = get_current_user_id();
+		$post_ids_raw = $req->get_param( 'post_ids' );
+		if ( ! $post_ids_raw ) {
+			return rest_ensure_response( [] );
+		}
+		$post_ids = array_values( array_filter( array_map( 'absint', explode( ',', $post_ids_raw ) ) ) );
+		if ( empty( $post_ids ) ) {
+			return rest_ensure_response( [] );
+		}
+		$rows = CZH_PostNotes_DB::get_by_posts( $user_id, $post_ids );
+		return rest_ensure_response( array_values( array_map( [ 'CZH_PostNotes_DB', 'prepare_row' ], $rows ) ) );
 	}
 
 	// ---- Helpers ----

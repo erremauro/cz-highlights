@@ -177,3 +177,115 @@ class CZH_DB {
 		);
 	}
 }
+
+class CZH_PostNotes_DB {
+
+	const TABLE = 'czh_post_notes';
+
+	public static function table_name() {
+		global $wpdb;
+		return $wpdb->prefix . self::TABLE;
+	}
+
+	public static function create_table() {
+		global $wpdb;
+		$table           = self::table_name();
+		$charset_collate = $wpdb->get_charset_collate();
+		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+		$sql = "CREATE TABLE {$table} (
+			id         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			user_id    BIGINT UNSIGNED NOT NULL,
+			post_id    BIGINT UNSIGNED NOT NULL,
+			note       TEXT NOT NULL,
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			PRIMARY KEY  (id),
+			UNIQUE KEY idx_user_post (user_id, post_id)
+		) {$charset_collate};";
+		dbDelta( $sql );
+	}
+
+	public static function get( $user_id, $post_id ) {
+		global $wpdb;
+		return $wpdb->get_row(
+			$wpdb->prepare(
+				'SELECT * FROM ' . self::table_name() . ' WHERE user_id = %d AND post_id = %d',
+				(int) $user_id,
+				(int) $post_id
+			),
+			ARRAY_A
+		);
+	}
+
+	public static function get_by_posts( $user_id, array $post_ids ) {
+		global $wpdb;
+		if ( empty( $post_ids ) ) {
+			return [];
+		}
+		$table        = self::table_name();
+		$placeholders = implode( ',', array_fill( 0, count( $post_ids ), '%d' ) );
+		$values       = array_merge( [ (int) $user_id ], array_map( 'intval', $post_ids ) );
+		// phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+		return $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT * FROM {$table} WHERE user_id = %d AND post_id IN ({$placeholders})",
+				...$values
+			),
+			ARRAY_A
+		);
+	}
+
+	public static function upsert( $user_id, $post_id, $note ) {
+		global $wpdb;
+		$table    = self::table_name();
+		$existing = self::get( $user_id, $post_id );
+		$now      = current_time( 'mysql', true );
+		$note_val = sanitize_textarea_field( $note );
+
+		if ( $existing ) {
+			$wpdb->update(
+				$table,
+				[ 'note' => $note_val, 'updated_at' => $now ],
+				[ 'user_id' => (int) $user_id, 'post_id' => (int) $post_id ],
+				[ '%s', '%s' ],
+				[ '%d', '%d' ]
+			);
+		} else {
+			$wpdb->insert(
+				$table,
+				[
+					'user_id'    => (int) $user_id,
+					'post_id'    => (int) $post_id,
+					'note'       => $note_val,
+					'created_at' => $now,
+					'updated_at' => $now,
+				],
+				[ '%d', '%d', '%s', '%s', '%s' ]
+			);
+		}
+		return self::get( $user_id, $post_id );
+	}
+
+	public static function delete( $user_id, $post_id ) {
+		global $wpdb;
+		return (bool) $wpdb->delete(
+			self::table_name(),
+			[ 'user_id' => (int) $user_id, 'post_id' => (int) $post_id ],
+			[ '%d', '%d' ]
+		);
+	}
+
+	public static function prepare_row( $row ) {
+		if ( ! $row ) {
+			return null;
+		}
+		return [
+			'id'         => (int) $row['id'],
+			'user_id'    => (int) $row['user_id'],
+			'post_id'    => (int) $row['post_id'],
+			'note'       => (string) $row['note'],
+			'created_at' => (string) $row['created_at'],
+			'updated_at' => (string) $row['updated_at'],
+		];
+	}
+}
