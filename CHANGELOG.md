@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] 2026-06-12
+### Fixed
+- Validate `status` field in `update_highlight` REST endpoint — only `active`, `displaced`, `orphaned` are accepted.
+- `maybe_upgrade_db` now runs `CZH_DB::create_table()` in addition to `CZH_PostNotes_DB::create_table()` on schema upgrade.
+### Security
+- Added maximum of 200 highlights per user per post in `create_highlight` (HTTP 429 when exceeded).
+### Added
+- `CZH_DB_VERSION` constant to track schema version independently from plugin version.
+- `CZH_DB::count_by_user_post()` helper used by the highlights limit guard.
+- `KEY idx_user (user_id)` index on `czh_highlights` table for faster user-wide queries.
+- `uninstall.php` — drops `czh_highlights` and `czh_post_notes` tables and removes plugin options on uninstall.
+### Changed
+- Updated author metadata to Roberto Mauro.
+
 ## [1.3.0] 2026-05-30
 ### Added
 - Add Personal Notes to Articles.
@@ -43,7 +57,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - First Release!
 
 
-[Unreleased]: https://github.com/erremauro/cz-highlights/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/erremauro/cz-highlights/compare/v1.3.1...HEAD
+[1.3.1]: https://github.com/erremauro/cz-highlights/releases/tag/v1.3.1
 [1.3.0]: https://github.com/erremauro/cz-highlights/releases/tag/v1.3.0
 [1.2.1]: https://github.com/erremauro/cz-highlights/releases/tag/v1.2.1
 [1.2.0]: https://github.com/erremauro/cz-highlights/releases/tag/v1.2.0

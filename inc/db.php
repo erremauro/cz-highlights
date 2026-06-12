@@ -36,10 +36,27 @@ class CZH_DB {
 			updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 			PRIMARY KEY  (id),
 			KEY idx_user_post (user_id, post_id),
+			KEY idx_user (user_id),
 			KEY idx_post (post_id)
 		) {$charset_collate};";
 
 		dbDelta( $sql );
+	}
+
+	/**
+	 * Returns the number of active highlights for a user+post.
+	 */
+	public static function count_by_user_post( $user_id, $post_id ) {
+		global $wpdb;
+		$table = self::table_name();
+
+		return (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM {$table} WHERE user_id = %d AND post_id = %d AND status != 'orphaned'",
+				(int) $user_id,
+				(int) $post_id
+			)
+		);
 	}
 
 	/**

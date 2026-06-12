@@ -2,8 +2,8 @@
 /**
  * Plugin Name: CZ Highlights
  * Description: Evidenziazioni e note personali per articoli e volumi. Solo per utenti registrati.
- * Version:     1.0.0
- * Author:      CZ
+ * Version:     1.3.1
+ * Author:      Roberto Mauro
  * Text Domain: cz-highlights
  */
 
@@ -11,7 +11,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'CZH_VERSION',  '1.0.0' );
+define( 'CZH_VERSION',    '1.3.1' );
+define( 'CZH_DB_VERSION', '1.3.1' );
 define( 'CZH_PATH',     plugin_dir_path( __FILE__ ) );
 define( 'CZH_URL',      plugins_url( '', __FILE__ ) . '/' );
 
@@ -267,10 +268,12 @@ final class CZ_Highlights {
 	/** ---- DB upgrade ---- */
 
 	public function maybe_upgrade_db() {
-		if ( get_option( 'czh_db_version' ) !== CZH_VERSION ) {
-			CZH_PostNotes_DB::create_table();
-			update_option( 'czh_db_version', CZH_VERSION );
+		if ( get_option( 'czh_db_version' ) === CZH_DB_VERSION ) {
+			return;
 		}
+		CZH_DB::create_table();
+		CZH_PostNotes_DB::create_table();
+		update_option( 'czh_db_version', CZH_DB_VERSION );
 	}
 
 	/** ---- Post note bar (appended after article content) ---- */

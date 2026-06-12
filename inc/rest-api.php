@@ -171,6 +171,11 @@ class CZH_REST {
 			return new WP_Error( 'czh_not_found', 'Post not found', [ 'status' => 404 ] );
 		}
 
+		$count = CZH_DB::count_by_user_post( $user_id, $post_id );
+		if ( $count >= 200 ) {
+			return new WP_Error( 'czh_limit_exceeded', 'Highlight limit reached for this post (max 200)', [ 'status' => 429 ] );
+		}
+
 		$selected = (string) $req->get_param( 'selected_text' );
 		if ( mb_strlen( $selected ) < 1 || mb_strlen( $selected ) > 5000 ) {
 			return new WP_Error( 'czh_invalid_text', 'selected_text must be 1–5000 chars', [ 'status' => 400 ] );
@@ -218,7 +223,10 @@ class CZH_REST {
 			$data['color'] = in_array( $body['color'], $allowed, true ) ? $body['color'] : $existing['color'];
 		}
 		if ( isset( $body['status'] ) ) {
-			$data['status'] = $body['status'];
+			$allowed_statuses = [ 'active', 'displaced', 'orphaned' ];
+			if ( in_array( $body['status'], $allowed_statuses, true ) ) {
+				$data['status'] = $body['status'];
+			}
 		}
 
 		$row = CZH_DB::update( $id, $user_id, $data );
