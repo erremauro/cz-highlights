@@ -160,6 +160,7 @@ class CZH_REST {
 		}
 
 		$rows = CZH_DB::get_by_post( $user_id, $post_id );
+		$rows = self::sort_by_position( $rows );
 		return rest_ensure_response( array_map( [ __CLASS__, 'prepare_highlight' ], $rows ) );
 	}
 
@@ -378,6 +379,8 @@ class CZH_REST {
 			);
 		}
 
+		$rows = self::sort_by_position( $rows );
+
 		$out             = [];
 		$post_meta_cache = [];
 
@@ -431,6 +434,7 @@ class CZH_REST {
 
 		$post_ids = array_map( 'intval', $post_ids );
 		$rows     = CZH_DB::get_by_posts( $user_id, $post_ids );
+		$rows     = self::sort_by_position( $rows );
 
 		// Group by post_id and attach post title/permalink for context
 		$out = [];
@@ -581,6 +585,77 @@ class CZH_REST {
 	}
 
 	// ---- Helpers ----
+
+	/**
+	 * Reorders highlight rows by their position in the post text (instead of
+	 * creation date). Rows are grouped by post_id (grouping order preserved),
+	 * the post's plain text is extracted once per group, and each row's
+	 * character offset is located within it. Rows whose text can no longer be
+	 * found (e.g. orphaned) keep their original relative order at the end of
+	 * their group.
+	 */
+	private static function sort_by_position( array $rows ) : array {
+		if ( count( $rows ) < 2 ) {
+			return $rows;
+		}
+
+		$groups      = [];
+		$group_order = [];
+		foreach ( $rows as $row ) {
+			$pid = (int) $row['post_id'];
+			if ( ! isset( $groups[ $pid ] ) ) {
+				$groups[ $pid ] = [];
+				$group_order[]  = $pid;
+			}
+			$groups[ $pid ][] = $row;
+		}
+
+		$out = [];
+		foreach ( $group_order as $pid ) {
+			$group = $groups[ $pid ];
+
+			if ( count( $group ) > 1 ) {
+				$post = get_post( $pid );
+				$text = $post ? CZH_Post_Watcher::extract_text( $post ) : '';
+
+				foreach ( $group as $i => &$row ) {
+					$row['_czh_pos']   = '' !== $text ? CZH_Post_Watcher::locate_offset( $row, $text ) : null;
+					$row['_czh_index'] = $i;
+				}
+				unset( $row );
+
+				usort( $group, function ( $a, $b ) {
+					$pa = $a['_czh_pos'];
+					$pb = $b['_czh_pos'];
+
+					if ( null === $pa && null === $pb ) {
+						return $a['_czh_index'] <=> $b['_czh_index'];
+					}
+					if ( null === $pa ) {
+						return 1;
+					}
+					if ( null === $pb ) {
+						return -1;
+					}
+					if ( $pa === $pb ) {
+						return $a['_czh_index'] <=> $b['_czh_index'];
+					}
+					return $pa <=> $pb;
+				} );
+
+				foreach ( $group as &$row ) {
+					unset( $row['_czh_pos'], $row['_czh_index'] );
+				}
+				unset( $row );
+			}
+
+			foreach ( $group as $row ) {
+				$out[] = $row;
+			}
+		}
+
+		return $out;
+	}
 
 	private static function post_is_readable( $post_id ) {
 		$post = get_post( $post_id );

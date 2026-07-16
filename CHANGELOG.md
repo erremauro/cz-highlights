@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.2] 2026-07-16
+### Changed
+- Highlights now appear ordered by their position in the article text instead of by creation date, in every view (article drawer, volume drawer, and the "Le Mie Note" page). Ordering is computed server-side by locating each highlight's fingerprint in the post's plain text; highlights that can no longer be located keep their original relative order at the end of their group.
+
 ## [1.3.1] 2026-06-12
 ### Fixed
 - Validate `status` field in `update_highlight` REST endpoint — only `active`, `displaced`, `orphaned` are accepted.

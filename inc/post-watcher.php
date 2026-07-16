@@ -111,12 +111,40 @@ class CZH_Post_Watcher {
 	}
 
 	/**
+	 * Locate a highlight's character offset within the post's plain text, using
+	 * the same prefix/selected/suffix matching as compute_status(). Used to sort
+	 * highlights by their position in the text instead of by creation date.
+	 *
+	 * @return int|null Offset, or null if the highlight can't be located.
+	 */
+	public static function locate_offset( array $row, string $text ) : ?int {
+		$selected = self::norm_ws( (string) ( $row['selected_text'] ?? '' ) );
+		$prefix   = self::norm_ws( (string) ( $row['prefix_text'] ?? '' ) );
+		$suffix   = self::norm_ws( (string) ( $row['suffix_text'] ?? '' ) );
+
+		if ( '' === $selected ) {
+			return null;
+		}
+
+		if ( '' !== $prefix || '' !== $suffix ) {
+			$needle = trim( $prefix . ' ' . $selected . ' ' . $suffix );
+			$pos    = strpos( $text, $needle );
+			if ( false !== $pos ) {
+				return $pos + strlen( $prefix ) + ( '' !== $prefix ? 1 : 0 );
+			}
+		}
+
+		$pos = strpos( $text, $selected );
+		return false !== $pos ? $pos : null;
+	}
+
+	/**
 	 * Extract plain text from a WP_Post, approximating what the browser sees.
 	 *
 	 * For multi-page posts (<!--nextpage-->) we join all pages so fingerprints
 	 * captured anywhere in the article can be matched.
 	 */
-	private static function extract_text( WP_Post $post ) : string {
+	public static function extract_text( WP_Post $post ) : string {
 		$content = $post->post_content;
 
 		// Join paginated content

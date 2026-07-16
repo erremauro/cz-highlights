@@ -766,7 +766,29 @@
       });
 
       highlights.push(created);
-      applyHighlightToDOM(created, getContentEl());
+      const container = getContentEl();
+      applyHighlightToDOM(created, container);
+
+      // Re-sort by position in the text (DOM order for the current page;
+      // stable/unchanged for other pages) instead of leaving the new item last.
+      if (container) {
+        const domOrder = new Map();
+        container.querySelectorAll('.czh-hl[data-id]').forEach((el, i) => {
+          domOrder.set(Number(el.dataset.id), i);
+        });
+        const currentPage = ctx.pageNum || 1;
+        highlights.sort((a, b) => {
+          const pa = a.page_num || 1, pb = b.page_num || 1;
+          if (pa !== pb) return pa - pb;
+          if (pa === currentPage) {
+            const ia = domOrder.has(a.id) ? domOrder.get(a.id) : Infinity;
+            const ib = domOrder.has(b.id) ? domOrder.get(b.id) : Infinity;
+            if (ia !== ib) return ia - ib;
+          }
+          return 0;
+        });
+      }
+
       refreshDrawerList();
 
       // Open note popover on the new mark
