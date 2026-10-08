@@ -2,7 +2,7 @@
 /**
  * Plugin Name: CZ Highlights
  * Description: Evidenziazioni e note personali per articoli e volumi. Solo per utenti registrati.
- * Version:     1.3.2
+ * Version:     1.4.0
  * Author:      Roberto Mauro
  * Text Domain: cz-highlights
  */
@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'CZH_VERSION',    '1.3.2' );
+define( 'CZH_VERSION',    '1.4.0' );
 define( 'CZH_DB_VERSION', '1.3.1' );
 define( 'CZH_PATH',     plugin_dir_path( __FILE__ ) );
 define( 'CZH_URL',      plugins_url( '', __FILE__ ) . '/' );
@@ -68,7 +68,6 @@ final class CZ_Highlights {
 		add_action( 'wp_footer',               [ $this, 'print_drawer' ] );
 		add_action( 'czh_nav_user_menu_items', [ $this, 'render_nav_menu_item' ] );
 		add_filter( 'body_class',              [ $this, 'add_body_classes' ] );
-		add_filter( 'the_content',             [ $this, 'append_post_note_bar' ] );
 		add_shortcode( 'czh_my_notes',         [ $this, 'render_notes_shortcode' ] );
 	}
 
@@ -167,6 +166,7 @@ final class CZ_Highlights {
 					'no_notes_volume' => __( 'Nessuna nota in questo volume.', 'cz-highlights' ),
 					'no_notes_any'    => __( 'Nessuna nota ancora.', 'cz-highlights' ),
 					'goto'            => __( 'Vai', 'cz-highlights' ),
+					'goto_article'    => __( "Vai all'Articolo", 'cz-highlights' ),
 					'error_loading'    => __( 'Errore nel caricamento.', 'cz-highlights' ),
 					'standalone_title'    => __( 'Note sparse', 'cz-highlights' ),
 					'collapse_all'        => __( 'Comprimi', 'cz-highlights' ),
@@ -276,17 +276,16 @@ final class CZ_Highlights {
 		update_option( 'czh_db_version', CZH_DB_VERSION );
 	}
 
-	/** ---- Post note bar (appended after article content) ---- */
+	/** ---- Post note bar (printed by the theme where it wants it placed) ---- */
 
-	public function append_post_note_bar( $content ) {
+	public function render_post_note_bar() {
 		if ( ! is_singular( 'post' ) || ! is_user_logged_in() || ! $this->highlights_enabled() ) {
-			return $content;
+			return;
 		}
 		if ( ! in_the_loop() || ! is_main_query() ) {
-			return $content;
+			return;
 		}
-		$content .= '<div id="czh-post-note-bar" class="czh-post-note-bar" aria-live="polite"></div>';
-		return $content;
+		echo '<div id="czh-post-note-bar" class="czh-post-note-bar" aria-live="polite"></div>';
 	}
 
 	/** ---- Drawer HTML ---- */

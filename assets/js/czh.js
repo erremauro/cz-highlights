@@ -822,7 +822,23 @@
     document.querySelector('.czh-drawer-backdrop')?.classList.remove('is-visible');
   }
 
+  // Notifies the theme (header icons) of the current annotation state of the
+  // article. Called after every change, since all of them refresh the drawer.
+  function emitAnnotationsChange() {
+    if (!ctx || ctx.type !== 'post') return;
+    const active = highlights.filter(h => h.status !== 'orphaned');
+    document.dispatchEvent(new CustomEvent('czh:annotations-change', {
+      detail: {
+        postId:        ctx.postId,
+        hasHighlights: active.length > 0,
+        hasNotes:      !!(postNote && postNote.note) || active.some(h => h.note),
+      },
+    }));
+  }
+
   function refreshDrawerList() {
+    emitAnnotationsChange();
+
     const drawer = getDrawer();
     if (!drawer) return;
 
@@ -1422,11 +1438,16 @@
     const postId   = pn.post_id;
     const noteId   = pn.id;
     const noteHtml = truncHtml(pn.note, TRUNC_POST_NOTE, true);
+    // Always visible (read and edit mode): link to the article of the note.
+    const gotoLink = pn.post_permalink
+      ? `<a class="czh-notes__goto-btn" href="${escapeAttr(pn.post_permalink)}">${escapeHtml(i18n.goto_article)}</a>`
+      : '';
     return `
       <div class="czh-notes__post-note" data-post-id="${postId}" data-note-id="${noteId}">
         <div class="czh-notes__post-note-read">
           <p class="czh-notes__post-note-text">${noteHtml}</p>
           <div class="czh-notes__post-note-footer">
+            ${gotoLink}
             <button type="button" class="czh-notes__edit-btn" data-czh-pn-edit="${postId}">${escapeHtml(i18n.edit)}</button>
             <button type="button" class="czh-notes__del-btn" data-czh-pn-del="${postId}">${escapeHtml(i18n.delete)}</button>
           </div>
@@ -1826,6 +1847,7 @@
     postNote = pnRes.status === 'fulfilled' ? pnRes.value : null;
 
     renderPostNoteBar();
+    emitAnnotationsChange();
 
     // Render only highlights belonging to the current paginated page
     const currentPage = ctx.pageNum || 1;

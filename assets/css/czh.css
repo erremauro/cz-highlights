@@ -1194,6 +1194,13 @@ body.czh-overlay-open { overflow: hidden; }
   margin-top: .45rem;
 }
 
-/* Action buttons hidden by default; shown only in edit mode */
-#czh-notes-app .czh-notes__post-note-read .czh-notes__post-note-footer { display: none; }
-#czh-notes-app.czh-edit-mode .czh-notes__post-note-read .czh-notes__post-note-footer { display: flex; }
+/* Footer always visible ("Vai all'Articolo"); edit/delete buttons shown only in edit mode */
+#czh-notes-app .czh-notes__post-note-read .czh-notes__post-note-footer .czh-notes__edit-btn,
+#czh-notes-app .czh-notes__post-note-read .czh-notes__post-note-footer .czh-notes__del-btn { display: none; }
+#czh-notes-app.czh-edit-mode .czh-notes__post-note-read .czh-notes__post-note-footer .czh-notes__edit-btn,
+#czh-notes-app.czh-edit-mode .czh-notes__post-note-read .czh-notes__post-note-footer .czh-notes__del-btn { display: inline-block; }
+
+a.czh-notes__goto-btn {
+  display: inline-block;
+  text-decoration: none;
+}

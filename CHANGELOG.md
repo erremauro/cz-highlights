@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] 2026-10-08
+### Added
+- `czh:annotations-change` event dispatched on `document` on article pages after the initial load and after every highlight/note change (`detail: { postId, hasHighlights, hasNotes }`), so themes can reflect the annotation state in real time.
+- "Le Mie Note" page: "Vai all'Articolo" link in the article note footer (`.czh-notes__post-note-footer`), always visible both in normal and edit mode, linking to the note's article. Edit/Delete buttons are still shown only in edit mode.
+- New i18n string `goto_article`.
+
 ## [1.3.2] 2026-07-16
 ### Changed
 - Highlights now appear ordered by their position in the article text instead of by creation date, in every view (article drawer, volume drawer, and the "Le Mie Note" page). Ordering is computed server-side by locating each highlight's fingerprint in the post's plain text; highlights that can no longer be located keep their original relative order at the end of their group.
