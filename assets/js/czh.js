@@ -257,6 +257,38 @@
     wrapRange(range, highlight.id, highlight.color, highlight.note);
   }
 
+  // ── "Text may have changed" warning ───────────────────────────────────────
+
+  function displacedWarningHtml(h, cls) {
+    if (h.status !== 'displaced' || h.displaced_ack) return '';
+    return `<p class="${cls} czh-warning">
+      <span class="czh-warning__text">${escapeHtml(i18n.displaced_msg)}</span>
+      <button type="button" class="czh-warning__dismiss" data-czh-dismiss-warning="${h.id}"
+        aria-label="${escapeAttr(i18n.dismiss_warning)}" title="${escapeAttr(i18n.dismiss_warning)}">
+        <svg viewBox="0 0 16 16" width="10" height="10" aria-hidden="true" focusable="false"><path d="M3 8.5l3.2 3.2L13 4.8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </p>`;
+  }
+
+  // Delegated: works in the drawer and on the "Le Mie Note" page alike.
+  document.addEventListener('click', async e => {
+    const btn = e.target.closest('[data-czh-dismiss-warning]');
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const id = Number(btn.dataset.czhDismissWarning);
+    btn.disabled = true;
+    try {
+      await apiFetch(`highlights/${id}/dismiss-warning`, { method: 'POST' });
+      const hl = highlights.find(h => h.id === id);
+      if (hl) hl.displaced_ack = true;
+      btn.closest('.czh-warning')?.remove();
+    } catch (err) {
+      btn.disabled = false;
+      console.error('[CZH] dismiss warning failed', err);
+    }
+  });
+
   // ── Remove highlight mark from DOM ─────────────────────────────────────────
 
   function removeHighlightFromDOM(id) {
@@ -877,7 +909,7 @@
         <div class="czh-drawer__item" data-id="${h.id}" data-color="${escapeAttr(h.color)}">
           <div class="czh-drawer__item-text">${escapeHtml(h.selected_text)}</div>
           ${noteHtml}
-          ${h.status === 'displaced' ? `<p class="czh-drawer__item-warning">${escapeHtml(i18n.displaced_msg)}</p>` : ''}
+          ${displacedWarningHtml(h, 'czh-drawer__item-warning')}
           <div class="czh-drawer__item-actions">
             <button type="button" class="czh-drawer__scroll-btn"
               data-czh-scroll-to="${h.id}"
@@ -1406,7 +1438,7 @@
       <div class="czh-notes__item" data-id="${h.id}" data-color="${escapeAttr(h.color)}">
         <blockquote class="czh-notes__quote${h.post ? ' czh-notes__quote--clickable' : ''}" data-czh-quote-id="${h.id}"${quotePermalinkAttrs}>${escapeHtml(h.selected_text)}</blockquote>
         <div class="czh-notes__item-read">
-          ${h.status === 'displaced' ? `<p class="czh-notes__item-warning">${escapeHtml(i18n.displaced_msg)}</p>` : ''}
+          ${displacedWarningHtml(h, 'czh-notes__item-warning')}
           ${h.note ? `<p class="czh-notes__annotation">${escapeHtml(h.note)}</p>` : ''}
           <div class="czh-notes__item-footer">
             ${gotoBtn}

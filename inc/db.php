@@ -32,6 +32,7 @@ class CZH_DB {
 			note         TEXT,
 			color        VARCHAR(30) NOT NULL DEFAULT 'yellow',
 			status       VARCHAR(20) NOT NULL DEFAULT 'active',
+			displaced_ack TINYINT(1) NOT NULL DEFAULT 0,
 			created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 			PRIMARY KEY  (id),
@@ -55,6 +56,23 @@ class CZH_DB {
 				"SELECT COUNT(*) FROM {$table} WHERE user_id = %d AND post_id = %d AND status != 'orphaned'",
 				(int) $user_id,
 				(int) $post_id
+			)
+		);
+	}
+
+	/**
+	 * Marks the "text may have changed" warning of a highlight as dismissed.
+	 * Leaves updated_at untouched: dismissing a warning is not a content edit.
+	 */
+	public static function dismiss_warning( $id, $user_id ) {
+		global $wpdb;
+		$table = self::table_name();
+
+		return false !== $wpdb->query(
+			$wpdb->prepare(
+				"UPDATE {$table} SET displaced_ack = 1, updated_at = updated_at WHERE id = %d AND user_id = %d",
+				(int) $id,
+				(int) $user_id
 			)
 		);
 	}

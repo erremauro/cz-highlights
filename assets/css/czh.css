@@ -584,6 +584,42 @@ body.czh-overlay-open { overflow: hidden; }
   font-size: .78rem;
 }
 
+.czh-warning {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+}
+
+.czh-warning__dismiss {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  padding: 0;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--czh-text-muted);
+  cursor: pointer;
+  opacity: .8;
+  transition: opacity .15s, background-color .15s, color .15s;
+}
+
+.czh-warning__dismiss:hover,
+.czh-warning__dismiss:focus-visible {
+  opacity: 1;
+  background: var(--czh-text-muted);
+  border-color: var(--czh-text-muted);
+  color: #fff;
+}
+
+.czh-warning__dismiss:disabled {
+  opacity: .4;
+  cursor: default;
+}
+
 .czh-drawer__item-actions {
   display: flex;
   gap: .4rem;

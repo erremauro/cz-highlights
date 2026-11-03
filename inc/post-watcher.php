@@ -58,11 +58,12 @@ class CZH_Post_Watcher {
 				$wpdb->update(
 					$table,
 					[
-						'status'     => $new_status,
-						'updated_at' => current_time( 'mysql', true ),
+						'status'        => $new_status,
+						'displaced_ack' => 0, // a new status change must be acknowledged again
+						'updated_at'    => current_time( 'mysql', true ),
 					],
 					[ 'id' => (int) $row['id'] ],
-					[ '%s', '%s' ],
+					[ '%s', '%d', '%s' ],
 					[ '%d' ]
 				);
 			}

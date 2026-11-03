@@ -2,7 +2,7 @@
 /**
  * Plugin Name: CZ Highlights
  * Description: Evidenziazioni e note personali per articoli e volumi. Solo per utenti registrati.
- * Version:     1.4.0
+ * Version:     1.5.0
  * Author:      Roberto Mauro
  * Text Domain: cz-highlights
  */
@@ -11,8 +11,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'CZH_VERSION',    '1.4.0' );
-define( 'CZH_DB_VERSION', '1.3.1' );
+define( 'CZH_VERSION',    '1.5.0' );
+define( 'CZH_DB_VERSION', '1.5.0' );
 define( 'CZH_PATH',     plugin_dir_path( __FILE__ ) );
 define( 'CZH_URL',      plugins_url( '', __FILE__ ) . '/' );
 
@@ -155,6 +155,7 @@ final class CZ_Highlights {
 					'note_label'      => __( 'Nota', 'cz-highlights' ),
 					'close'           => __( 'Chiudi', 'cz-highlights' ),
 					'displaced_msg'   => __( 'Il testo di questa evidenziazione potrebbe essere cambiato.', 'cz-highlights' ),
+					'dismiss_warning' => __( 'Ho capito, nascondi questo avviso', 'cz-highlights' ),
 					'orphaned_msg'    => __( 'Questa evidenziazione non è più trovabile nel testo.', 'cz-highlights' ),
 					'loading'         => __( 'Caricamento…', 'cz-highlights' ),
 					'open_volume'     => __( 'Apri', 'cz-highlights' ),

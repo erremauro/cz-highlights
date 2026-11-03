@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] 2026-11-03
+### Added
+- Small round checkmark button next to the "Il testo di questa evidenziazione potrebbe essere cambiato." warning, both in the article drawer and on the "Le Mie Note" page: clicking it dismisses the warning permanently for that highlight.
+- `displaced_ack` column on `czh_highlights` (schema version `1.5.0`) storing whether the user dismissed the warning; exposed as a boolean `displaced_ack` field in every highlight REST response.
+- REST endpoint `POST /highlights/{id}/dismiss-warning` (owner only). It does not change `updated_at`.
+- New i18n string `dismiss_warning`.
+### Changed
+- The post watcher resets `displaced_ack` whenever a highlight's status changes, so a new change to the article text shows the warning again.
+
 ## [1.4.0] 2026-10-08
 ### Added
 - `czh:annotations-change` event dispatched on `document` on article pages after the initial load and after every highlight/note change (`detail: { postId, hasHighlights, hasNotes }`), so themes can reflect the annotation state in real time.
@@ -67,7 +76,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - First Release!
 
 
-[Unreleased]: https://github.com/erremauro/cz-highlights/compare/v1.3.1...HEAD
+[Unreleased]: https://github.com/erremauro/cz-highlights/compare/v1.5.o...HEAD
+[1.5.0]: https://github.com/erremauro/cz-highlights/releases/tag/v1.5.0
+[1.4.0]: https://github.com/erremauro/cz-highlights/releases/tag/v1.4.0
+[1.3.2]: https://github.com/erremauro/cz-highlights/releases/tag/v1.3.2
 [1.3.1]: https://github.com/erremauro/cz-highlights/releases/tag/v1.3.1
 [1.3.0]: https://github.com/erremauro/cz-highlights/releases/tag/v1.3.0
 [1.2.1]: https://github.com/erremauro/cz-highlights/releases/tag/v1.2.1

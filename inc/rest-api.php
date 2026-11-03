@@ -55,6 +55,13 @@ class CZH_REST {
 			],
 		] );
 
+		// POST /highlights/{id}/dismiss-warning → hide the "text may have changed" warning
+		register_rest_route( self::NAMESPACE, '/highlights/(?P<id>\d+)/dismiss-warning', [
+			'methods'             => WP_REST_Server::CREATABLE,
+			'callback'            => [ __CLASS__, 'dismiss_warning' ],
+			'permission_callback' => [ __CLASS__, 'require_login' ],
+		] );
+
 		// GET /highlights/summary → volumes with highlight counts for the current user
 		register_rest_route( self::NAMESPACE, '/highlights/summary', [
 			'methods'             => WP_REST_Server::READABLE,
@@ -232,6 +239,19 @@ class CZH_REST {
 
 		$row = CZH_DB::update( $id, $user_id, $data );
 		return rest_ensure_response( self::prepare_highlight( $row ) );
+	}
+
+	public static function dismiss_warning( WP_REST_Request $req ) {
+		$user_id = get_current_user_id();
+		$id      = (int) $req->get_param( 'id' );
+
+		$existing = CZH_DB::get_by_id( $id );
+		if ( ! $existing || (int) $existing['user_id'] !== $user_id ) {
+			return new WP_Error( 'czh_not_found', 'Highlight not found', [ 'status' => 404 ] );
+		}
+
+		CZH_DB::dismiss_warning( $id, $user_id );
+		return rest_ensure_response( self::prepare_highlight( CZH_DB::get_by_id( $id ) ) );
 	}
 
 	public static function delete_highlight( WP_REST_Request $req ) {
@@ -683,6 +703,7 @@ class CZH_REST {
 			'note'          => isset( $row['note'] ) ? (string) $row['note'] : null,
 			'color'         => (string) $row['color'],
 			'status'        => (string) $row['status'],
+			'displaced_ack' => ! empty( $row['displaced_ack'] ),
 			'created_at'    => (string) $row['created_at'],
 			'updated_at'    => (string) $row['updated_at'],
 		];
