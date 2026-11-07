@@ -335,31 +335,28 @@
     tooltip && tooltip.classList.remove('is-visible');
   }
 
-  // ── Toolbar button (mobile only) ───────────────────────────────────────────
+  // ── Toolbar button (mobile only, cz-toolbar) ───────────────────────────────
 
   let toolbarBtn = null;
 
-  function injectToolbarButton() {
-    const toolbar = document.querySelector(sel.toolbar);
-    if (!toolbar) return null;
-
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'czcr-toolbar__btn czh-toolbar-btn';
-    btn.setAttribute('aria-label', i18n.highlight);
-    btn.setAttribute('data-czh-do-highlight', '');
-    btn.innerHTML = `
-      <span class="czcr-icon" aria-hidden="true">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-        </svg>
-      </span>`;
+  // Il pulsante è nella toolbar di cz-core (registrato in PHP): qui solo il click.
+  function bindToolbarButton() {
+    const btn = document.querySelector('[data-cz-toolbar="highlight"]');
+    if (!btn) return null;
     btn.addEventListener('click', onHighlightRequest);
-    // Insert as second child so it sits between the two existing toolbar buttons
-    const secondChild = toolbar.children[1];
-    if (secondChild) toolbar.insertBefore(btn, secondChild);
-    else toolbar.appendChild(btn);
     return btn;
+  }
+
+  // Su mobile il pulsante sta sopra "Su" (czh.css): ne passa il centro orizzontale,
+  // rispetto alla toolbar, nella variabile --czh-anchor-x.
+  function positionToolbarButton() {
+    const bar    = toolbarBtn && toolbarBtn.closest('.cz-toolbar');
+    const anchor = bar && bar.querySelector('[data-cz-toolbar="top"]');
+    if (!anchor) return;
+    const barRect = bar.getBoundingClientRect();
+    const rect    = anchor.getBoundingClientRect();
+    if (!rect.width) return;
+    toolbarBtn.style.setProperty('--czh-anchor-x', `${rect.left + rect.width / 2 - barRect.left}px`);
   }
 
   // ── Note popover (color picker, appears anchored to mark) ─────────────────
@@ -1027,6 +1024,7 @@
 
     if (isTouch && toolbarBtn) {
       toolbarBtn.classList.add('czh-is-visible');
+      positionToolbarButton();
     }
   }
 
@@ -1855,7 +1853,7 @@
     // Guest: only selection + tooltip → redirect to login
     if (!cfg.user.loggedIn) {
       if (!isArticle) return;
-      if (isTouch) toolbarBtn = injectToolbarButton();
+      if (isTouch) toolbarBtn = bindToolbarButton();
       document.addEventListener('selectionchange', onSelectionChange);
       document.addEventListener('mouseup', onMouseUp);
       return;
@@ -1900,7 +1898,7 @@
     }
 
     // Mobile toolbar button
-    if (isTouch) toolbarBtn = injectToolbarButton();
+    if (isTouch) toolbarBtn = bindToolbarButton();
 
     // Selection events
     document.addEventListener('selectionchange', onSelectionChange);

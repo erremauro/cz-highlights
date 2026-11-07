@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] 2026-11-06
+### Changed
+- Il pulsante "Evidenzia" della toolbar passa nella zona centrale, subito prima di "Su" (ordine 15). Su mobile (< 768px) non occupa più posto nella fila, dove finiva sotto altri pulsanti come l'indice: compare sulla riga superiore, centrato sopra "Su". `czh.js` ne calcola la posizione quando lo mostra (variabile CSS `--czh-anchor-x`). Da 768px resta nella fila, tra l'indice e "Su".
+
+## [1.6.0] 2026-11-05
+### Changed
+- Il pulsante "Evidenzia" per i dispositivi touch è registrato in PHP nella toolbar di cz-core (`cz_toolbar_add_button( 'highlight', … )`, zona sinistra dopo Home) invece di essere iniettato via JavaScript nella toolbar di cz-continue-reading; `czh.js` ne gestisce solo click e visibilità. Registrato con le stesse condizioni degli asset (articoli; per gli utenti registrati solo con l'evidenziatore attivo). Richiede cz-core 1.1.0 (`mu-plugins/cz-toolbar`).
+### Removed
+- Selettore `toolbar` dalla configurazione `selectors` dello script.
+
 ## [1.5.0] 2026-11-03
 ### Added
 - Small round checkmark button next to the "Il testo di questa evidenziazione potrebbe essere cambiato." warning, both in the article drawer and on the "Le Mie Note" page: clicking it dismisses the warning permanently for that highlight.
@@ -76,7 +86,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - First Release!
 
 
-[Unreleased]: https://github.com/erremauro/cz-highlights/compare/v1.5.o...HEAD
+[Unreleased]: https://github.com/erremauro/cz-highlights/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/erremauro/cz-highlights/releases/tag/v1.7.0
+[1.6.0]: https://github.com/erremauro/cz-highlights/releases/tag/v1.6.0
 [1.5.0]: https://github.com/erremauro/cz-highlights/releases/tag/v1.5.0
 [1.4.0]: https://github.com/erremauro/cz-highlights/releases/tag/v1.4.0
 [1.3.2]: https://github.com/erremauro/cz-highlights/releases/tag/v1.3.2

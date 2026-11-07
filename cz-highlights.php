@@ -2,7 +2,7 @@
 /**
  * Plugin Name: CZ Highlights
  * Description: Evidenziazioni e note personali per articoli e volumi. Solo per utenti registrati.
- * Version:     1.5.0
+ * Version:     1.7.0
  * Author:      Roberto Mauro
  * Text Domain: cz-highlights
  */
@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'CZH_VERSION',    '1.5.0' );
+define( 'CZH_VERSION',    '1.7.0' );
 define( 'CZH_DB_VERSION', '1.5.0' );
 define( 'CZH_PATH',     plugin_dir_path( __FILE__ ) );
 define( 'CZH_URL',      plugins_url( '', __FILE__ ) . '/' );
@@ -67,6 +67,7 @@ final class CZ_Highlights {
 		add_action( 'wp_enqueue_scripts',      [ $this, 'enqueue_assets' ] );
 		add_action( 'wp_footer',               [ $this, 'print_drawer' ] );
 		add_action( 'czh_nav_user_menu_items', [ $this, 'render_nav_menu_item' ] );
+		add_action( 'cz_toolbar_buttons',      [ $this, 'register_toolbar_button' ] );
 		add_filter( 'body_class',              [ $this, 'add_body_classes' ] );
 		add_shortcode( 'czh_my_notes',         [ $this, 'render_notes_shortcode' ] );
 	}
@@ -92,6 +93,32 @@ final class CZ_Highlights {
 	}
 
 	/** ---- Assets ---- */
+
+	/**
+	 * Pulsante "Evidenzia" nella toolbar di cz-core (mu-plugins/cz-toolbar),
+	 * al centro subito prima di "Su". Su mobile (< 768px) non occupa posto nella
+	 * fila: compare sulla riga superiore, centrato sopra "Su" (vedi czh.css).
+	 * Nascosto di default (.czh-toolbar-btn): czh.js lo mostra sui dispositivi
+	 * touch quando c'è del testo selezionato.
+	 * Stesse condizioni del caricamento degli asset sugli articoli.
+	 */
+	public function register_toolbar_button() {
+		if ( ! is_singular( 'post' ) || ! function_exists( 'cz_toolbar_add_button' ) ) {
+			return;
+		}
+		if ( is_user_logged_in() && ! $this->highlights_enabled() ) {
+			return;
+		}
+
+		cz_toolbar_add_button( 'highlight', [
+			'label' => __( 'Evidenzia', 'cz-highlights' ),
+			'zone'  => 'center',
+			'order' => 15,
+			'class' => 'czh-toolbar-btn',
+			'icon'  => '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>',
+			'attrs' => [ 'data-czh-do-highlight' => true ],
+		] );
+	}
 
 	public function enqueue_assets() {
 		$is_article    = is_singular( 'post' );
@@ -142,7 +169,6 @@ final class CZ_Highlights {
 				'colors'  => [ 'yellow', 'green', 'blue', 'pink', 'orange' ],
 				'selectors' => [
 					'content' => '.post-content',
-					'toolbar' => '.czcr-toolbar',
 				],
 				'i18n'    => [
 					'highlight'       => __( 'Evidenzia', 'cz-highlights' ),
@@ -188,7 +214,6 @@ final class CZ_Highlights {
 				'context'   => $this->build_context(),
 				'selectors' => [
 					'content' => '.post-content',
-					'toolbar' => '.czcr-toolbar',
 				],
 				'i18n'      => [
 					'highlight' => __( 'Evidenzia', 'cz-highlights' ),

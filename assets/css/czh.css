@@ -661,6 +661,18 @@ body.czh-overlay-open { overflow: hidden; }
   display: flex !important;
 }
 
+/* Su mobile il pulsante non entra nella fila: sta sulla riga superiore,
+   centrato sopra "Su". czh.js imposta --czh-anchor-x (centro di "Su" rispetto
+   alla toolbar); senza, il pulsante è centrato nella barra. */
+@media (max-width: 767.98px) {
+  .cz-toolbar .czh-toolbar-btn {
+    position: absolute;
+    bottom: 100%;
+    left: var(--czh-anchor-x, 50%);
+    transform: translateX(-50%);
+  }
+}
+
 /* ── Notes page ───────────────────────────────────────────────────────────── */
 
 .czh-notes__page-title {
